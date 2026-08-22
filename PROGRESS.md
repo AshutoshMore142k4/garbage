@@ -12,8 +12,7 @@ Status: **DONE** (2026-08-22)
       credentials were available to this session — see the doc's honesty caveat). Settlement leg
       will be synthesized in Phase 2 per `plan.md`'s own pre-planned mitigation.
 - [x] `make test` passes locally (`test_smoke.py`).
-- [ ] CI green — pending first push to GitHub (workflow added at `.github/workflows/ci.yml`, not
-      yet observed running).
+- [x] CI green — confirmed on PR #1 (GitHub Actions `test` job passed on commit `cd00f90`).
 - [x] No secret committed (`.env.example` has placeholders only; `.env` is gitignored).
 
 Repo structure scaffolded per `plan.md` §14: all top-level directories, `pyproject.toml`, `Makefile`
