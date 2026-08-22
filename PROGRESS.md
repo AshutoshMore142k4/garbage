@@ -27,7 +27,29 @@ generation and Phase 6's audit schema depend on it. This session did not fabrica
 
 ## Phase 1 — Foundation
 
-Status: **NOT STARTED**
+Status: **DONE** (2026-08-22)
+
+- [x] `uvicorn ledgerguard.api.app:app` starts; `GET /healthz` returns 200 with
+      `{ok, version, budget_spent_usd}` (verified both via `TestClient` in `tests/test_api.py`
+      and by actually running uvicorn and curling it).
+- [x] Database file created with all 9 tables from `plan.md` §15 and the
+      `idempotency_key UNIQUE` constraint present and enforced (`tests/test_db.py`).
+- [x] `make test` passes (12 tests: smoke, config x2, audit writer x2, db x2, api x1, plus
+      Phase 0's smoke test); CI to be confirmed green on push.
+- [x] `docs/adr/001-single-ai-component.md` written, with a concrete two-part revisit condition.
+- [x] `REAL_VS_SIMULATED.md` written; every source labelled; Settlements marked **SIMULATED**,
+      consistent with the Phase 0 R1 finding (and its own caveat that R1 itself was not
+      empirically confirmed with live credentials).
+
+**Deviation from `phases.md`'s literal task list, flagged explicitly:** `audit/writer.py`'s
+schema was supposed to follow `CLAUDE.md`, which does not exist (see Phase 0 note below). Instead
+the audit line is defined as the `MatchDecision` Pydantic model (`models.py`), which already
+carries every field `plan.md` §15/§19 require. If `CLAUDE.md` is written later with a conflicting
+schema, `audit/writer.py` and `models.py` need to be reconciled against it.
+
+New dependency: `pydantic-settings` (added to `pyproject.toml`) — needed for typed,
+env-var-driven `Settings` per `plan.md` §13's already-chosen Pydantic v2 stack; it's the
+standard companion package since `BaseSettings` moved out of `pydantic` core in v2.
 
 ## Phase 2 — Data + Ground Truth
 
