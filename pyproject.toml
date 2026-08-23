@@ -16,6 +16,7 @@ dependencies = [
     "python-dotenv>=1.0",
     "razorpay>=1.4",
     "anthropic>=0.69",
+    "matplotlib>=3.8",
 ]
 
 [project.optional-dependencies]

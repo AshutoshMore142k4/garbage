@@ -184,9 +184,51 @@ act on.
 
 New dependency: `anthropic` (official SDK) — the one LLM call site plan.md #11 specifies.
 
-## Phase 5 — L3 Calibration + Abstention Gate
+## Phase 5 — L3 Calibration + Abstention Gate — NEVER CUT
 
-Status: **NOT STARTED**
+Status: **DONE** (2026-08-23)
+
+- [x] ECE reported on holdout with a reliability diagram saved to `eval/output/`:
+      `python -m eval.calibration --data-dir data/samples` → raw-confidence ECE **0.0452**,
+      calibrated ECE **0.0237** on the committed sample dataset (calibration measurably helps).
+- [x] Cost curve plotted with the chosen threshold marked:
+      `python -m eval.cost_model --data-dir data/samples` → cost-optimal threshold **0.92**
+      (selected on validation only), plotted against the holdout cost curve.
+- [x] Exception queue populated, ranked by ₹ at risk, every entry with evidence — built from the
+      *actual* holdout decisions (not a synthetic example): on the sample dataset the two
+      highest-value entries are, unprompted, the duplicate-UTR and genuine-double-settlement
+      demo-pair bank lines from Phase 2 (`plan.md` §8 J4's cold open) — same amount, both
+      correctly refused, for two different reason codes. This wasn't engineered; it's what the
+      pipeline actually produces end to end.
+- [x] Threshold value is derived from `cost_model.find_optimal_threshold`, never hardcoded.
+- [x] `make test` passes (94 tests).
+
+**Design decisions worth recording:**
+
+- The calibrator is `sklearn.linear_model.LogisticRegression` fit on the full six-feature vector
+  (`partial_rule_agreement_count`, `absolute_amount_gap_paise`, `date_skew_days`,
+  `narration_similarity_score`, `candidate_set_size`, `model_self_rated_confidence`) — never on
+  raw confidence alone, per phases.md's explicit instruction. Fit strictly on validation;
+  holdout is only ever scored, never fit on.
+- The cost model's two cost terms are **documented assumptions, not measured figures** — plan.md
+  gives no real number for either: a false AUTO_POST costs the full misallocated amount
+  (definitional, not assumed), while an ESCALATE costs a flat ₹50 analyst-review fee
+  (`ESCALATION_COST_PAISE` in `cost_model.py`, explicitly flagged in its docstring as something
+  to replace once real analyst-time data exists).
+- `gate.py` reuses `AMBIGUOUS_NARRATION_MULTI_CANDIDATE` as the reason code for "a candidate was
+  proposed but didn't clear the threshold," rather than inventing a new code — this exactly
+  matches plan.md §8 J2's own worked example ("Calibrated confidence 0.62, threshold 0.94...
+  Reason: `AMBIGUOUS_NARRATION_MULTI_CANDIDATE`").
+- Because this repo still has no live Anthropic credentials (Phases 0/4), `decisions.py` builds
+  L2's half of the training data using the **free fallback**, not a real model call. The
+  calibrator only ever sees the feature vector, so this doesn't change what's being
+  demonstrated — calibrating and gating over decisions with a real raw confidence — but it does
+  mean L2's actual raw confidences in this dataset are the fallback's, not a live model's. This
+  should be revisited once real credentials exist, to confirm the calibrator behaves the same
+  way over live-model confidences.
+
+New dependency: `matplotlib` — needed for the reliability diagram and cost-curve plots this
+phase's acceptance criteria explicitly require.
 
 ## Phase 6 — L4 Anomaly + L5 Executor + Audit
 
