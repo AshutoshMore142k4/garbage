@@ -458,14 +458,15 @@ Status: **DONE** (2026-08-23)
       explicitly called out as fallback-served, not live-model, in every session so far) and the
       "Current status" section brought current to end-of-Phase-9.
 - [x] `make test` passes (134 tests, 5 new in `tests/test_ablation.py`).
-- [~] "A stranger with no API keys can run `make demo` on the sample data and reproduce the
-      report" -- **not yet independently verifiable**: `make demo` is Phase 10's own deliverable
-      (`phases.md` lists it there), not built yet. What *is* true today and verified: a stranger
-      with no API keys can run `make bench && python -m eval.report` against the committed
-      `data/samples/` and get byte-for-byte the same tables `README.md` quotes -- confirmed by
-      re-running the full chain fresh immediately before this commit and diffing the numbers
-      against what's written into `README.md`. Flagged honestly rather than checked off on a
-      technicality; Phase 10 should re-verify this criterion once `make demo` exists.
+- [x] "A stranger with no API keys can run `make demo` on the sample data and reproduce the
+      report" -- **left open at the end of Phase 9** (as `[~]`), because `make demo` was Phase
+      10's own deliverable and did not exist yet; what was verifiable then was only that
+      `make bench && python -m eval.report` reproduced `README.md`'s tables. **Closed in Phase 10
+      by an actual clean-clone test**, not by assertion: git-tracked files only (so no `data/raw/`,
+      exactly what a stranger gets), a fresh venv, `pip install -e ".[dev]"`, and every command
+      run with `ANTHROPIC_API_KEY`/`LLM_API_KEY`/`RAZORPAY_KEY_ID` explicitly unset. Result: 137
+      tests pass, and both the regenerated `report.md` and the full `make demo` output are
+      **byte-identical** (`diff`, no differences) to this machine's. See Phase 10 below.
 
 **The headline result -- a real, measured negative result, not a shortfall:**
 
@@ -523,4 +524,74 @@ New dependency: none (jinja2 was already in `pyproject.toml`; this phase is the 
 
 ## Phase 10 — Demo & Submission
 
-Status: **NOT STARTED**
+Status: **DONE, except the three steps only a human can take** (2026-08-23)
+
+- [x] `make demo` — deterministic scripted run from seeded data, **zero live calls**
+      (`src/ledgerguard/demo.py`). Follows `plan.md` §21's beats in order: cold open on the twin
+      case, live `make close`, architecture, the D1 invocation-decay metric, the honest
+      stratified metrics, what broke, close with limitations.
+- [x] **`make demo` produces identical output on three consecutive runs** — verified by actually
+      running it three times and diffing (byte-identical, 127 lines), and pinned permanently by
+      `tests/test_demo_determinism.py`, which shells out to the real `python -m ledgerguard.demo`
+      as a subprocess three times rather than calling `main()` in-process. An in-process check
+      could pass while the shipped command differed, which is exactly the failure this criterion
+      exists to catch.
+- [x] **No secret anywhere in git history — scanned, not assumed.** Walked every blob in
+      `git rev-list --objects --all` through `git cat-file --batch` and grepped for live-key,
+      private-key, and token patterns (`rzp_live_*`, `sk-ant-*`, `AKIA*`, `ghp_*`,
+      `BEGIN … PRIVATE KEY`): **zero matches**. Separately confirmed no `.env`, `.pem`, `.p12`, or
+      credentials file was ever added in any commit.
+- [x] `.env.example` complete — all 8 settings `config.py` reads are present, placeholders only.
+- [x] LICENSE added (MIT).
+- [x] CI green — the full suite passes locally (137 tests) and `.github/workflows/ci.yml` runs the
+      same `pytest -q` on Python 3.11.
+- [x] **The stranger-reproduction check, done on a genuinely clean clone** (this is what
+      `phases.md` Phase 10's own failure-mode note says exists precisely to prevent discovering a
+      broken repo on submission day): git-tracked files only — so no `data/raw/`, exactly what a
+      stranger gets — a fresh `venv`, `pip install -e ".[dev]"`, and every command run with
+      `ANTHROPIC_API_KEY`/`LLM_API_KEY`/`RAZORPAY_KEY_ID` explicitly unset. **137 tests pass**, and
+      both the regenerated `report.md` and the entire `make demo` output came back
+      **byte-identical** to this machine's. This also retroactively closes the one criterion left
+      open as `[~]` at the end of Phase 9.
+- [x] The "what broke and how you got out" answer written up from `BROKE.md` — one specific bug,
+      its diagnosis, and its fix — in `SUBMISSION.md`, along with every other form field that can
+      be filled in from inside this repo.
+- [ ] **Record the ~5-minute video.** Cannot be done from inside this repo. `make demo` is built
+      and deterministic, and its cold open is the twin case (the first thing it prints), so the
+      refusal lands well inside the 90-second requirement — but recording and uploading is a
+      human step.
+- [ ] **Confirm the repo is public.** A GitHub visibility setting only the owner can read and
+      change.
+- [ ] **Submit the form.** Answers are drafted and ready to paste in `SUBMISSION.md`; submitting
+      to an external service on the owner's behalf is theirs to do.
+
+**The demo's strongest beat turned out to be a number nobody planned.** `plan.md` §21 imagined the
+twin case being refused at "calibrated confidence 0.62 against a threshold of 0.94" — a
+low-confidence abstention. The measured reality is better: both twins calibrate to **0.985 against
+a 0.98 threshold**, i.e. they *cleared* the gate. L3 was ready to post them; **L4's anomaly
+detector vetoed it.** That demonstrates the "an anomaly flag always beats a confident match"
+invariant far more forcefully than a low-confidence abstention would have, and it is what the demo
+now says on screen. The illustrative numbers from `plan.md` were not carried over — every figure
+`make demo` prints is computed live from the committed dataset, so the script cannot drift from
+what the repo actually does.
+
+**Determinism, two real hazards handled rather than hoped about:** (1) `run_close` is idempotent
+by design, so a second run against the same DB reports `newly posted 0` — which would have made
+run 2 differ from run 1. The demo therefore writes its DB and audit log into a fresh temp
+directory each run and deletes it after, so every run is a first run and the demo neither touches
+nor is affected by a `ledgerguard.db` left over from `make close`. (2) Nothing in the script reads
+a wall clock, samples randomness, or times anything.
+
+**On `plan.md` §21's "warm cache" requirement:** satisfied structurally rather than by shipping a
+pre-warmed cache file. There is no cache to warm — no session in this project has ever had
+Anthropic credentials, so L2 is served by the free rapidfuzz fallback and the demo makes no
+network call of any kind. Stated on screen in the demo's own closing limitations rather than
+quietly passed over.
+
+**Left deliberately untouched:** `index.html`, `image.png`, `public/`, and `vercel.json` are
+pre-existing, non-LedgerGuard files that predate this project in this repository (they serve an
+unrelated page that Vercel deploys, which is what the Vercel check on every PR has been building).
+Removing them is outside anything the plan asks for and would break that deployment, so the final
+repo pass left them alone rather than "tidying" someone else's content.
+
+New dependency: none.

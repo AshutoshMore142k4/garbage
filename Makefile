@@ -26,7 +26,7 @@ d1:
 	$(PYTHON) -m eval.rule_learning
 
 demo:
-	@echo "demo: not yet implemented (see phases.md Phase 10)"
+	$(PYTHON) -m ledgerguard.demo
 
 test:
 	$(PYTHON) -m pytest -q
