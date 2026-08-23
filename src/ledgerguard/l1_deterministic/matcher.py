@@ -43,12 +43,17 @@ def load_ledger_payments(ledger_csv_path: Path) -> list[LedgerPayment]:
             payment_id = row["payment_id"]
             if not payment_id or payment_id in payments:
                 continue
-            net_paise = int(row["order_amount_paise"]) - int(row["fee_paise"]) - int(row["tax_paise"])
+            amount_paise = int(row["order_amount_paise"])
+            fee_paise = int(row["fee_paise"])
+            tax_paise = int(row["tax_paise"])
             payments[payment_id] = LedgerPayment(
                 payment_id=payment_id,
                 order_id=row["order_id"],
-                net_paise=net_paise,
+                net_paise=amount_paise - fee_paise - tax_paise,
                 captured_at=normalize_timestamp(row["captured_at"]),
+                amount_paise=amount_paise,
+                fee_paise=fee_paise,
+                tax_paise=tax_paise,
             )
     return list(payments.values())
 

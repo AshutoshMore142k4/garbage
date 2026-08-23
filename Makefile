@@ -13,7 +13,7 @@ gen:
 	$(PYTHON) -m data.generator --seed $(SEED) --out data/raw
 
 close:
-	@echo "close: not yet implemented (see phases.md Phase 3-6)"
+	$(PYTHON) -m ledgerguard.close --data-dir data/raw --db-path ledgerguard.db --audit-path audit.jsonl
 
 bench:
 	@echo "bench: not yet implemented (see phases.md Phase 9)"

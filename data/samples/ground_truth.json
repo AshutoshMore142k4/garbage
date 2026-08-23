@@ -9,25 +9,25 @@
     "bank_line_id": "bl_dup_00306",
     "correct_match": null,
     "difficulty": "ADVERSARIAL",
-    "split": "holdout"
+    "split": "train"
   },
   "bl_dup_00308": {
     "bank_line_id": "bl_dup_00308",
     "correct_match": null,
     "difficulty": "ADVERSARIAL",
-    "split": "validation"
+    "split": "train"
   },
   "bl_dup_00310": {
     "bank_line_id": "bl_dup_00310",
     "correct_match": null,
     "difficulty": "ADVERSARIAL",
-    "split": "train"
+    "split": "validation"
   },
   "bl_dup_00312": {
     "bank_line_id": "bl_dup_00312",
     "correct_match": null,
     "difficulty": "ADVERSARIAL",
-    "split": "validation"
+    "split": "train"
   },
   "bl_setl_synth_016ZZOILKQXLM5Q2": {
     "bank_line_id": "bl_setl_synth_016ZZOILKQXLM5Q2",
@@ -183,17 +183,6 @@
     "difficulty": "ADVERSARIAL",
     "split": "train"
   },
-  "bl_setl_synth_207MERBYEAWHMLVH": {
-    "bank_line_id": "bl_setl_synth_207MERBYEAWHMLVH",
-    "correct_match": {
-      "order_ids": [
-        "order_synth_00316"
-      ],
-      "settlement_id": "setl_synth_207MERBYEAWHMLVH"
-    },
-    "difficulty": "ADVERSARIAL",
-    "split": "train"
-  },
   "bl_setl_synth_29Q2L48C1CQG433E": {
     "bank_line_id": "bl_setl_synth_29Q2L48C1CQG433E",
     "correct_match": {
@@ -269,17 +258,6 @@
       "settlement_id": "setl_synth_350P3CYAZBCGJC36"
     },
     "difficulty": "EASY",
-    "split": "train"
-  },
-  "bl_setl_synth_37C6QC6K8DJZR5SW": {
-    "bank_line_id": "bl_setl_synth_37C6QC6K8DJZR5SW",
-    "correct_match": {
-      "order_ids": [
-        "order_synth_00314"
-      ],
-      "settlement_id": "setl_synth_37C6QC6K8DJZR5SW"
-    },
-    "difficulty": "ADVERSARIAL",
     "split": "train"
   },
   "bl_setl_synth_3BZT9D31K9QM3P91": {
@@ -370,17 +348,6 @@
     "difficulty": "EASY",
     "split": "validation"
   },
-  "bl_setl_synth_4QKE2GJR81BMQF7Z": {
-    "bank_line_id": "bl_setl_synth_4QKE2GJR81BMQF7Z",
-    "correct_match": {
-      "order_ids": [
-        "order_synth_00315"
-      ],
-      "settlement_id": "setl_synth_4QKE2GJR81BMQF7Z"
-    },
-    "difficulty": "ADVERSARIAL",
-    "split": "train"
-  },
   "bl_setl_synth_4VPW232UTVG9KU8S": {
     "bank_line_id": "bl_setl_synth_4VPW232UTVG9KU8S",
     "correct_match": {
@@ -416,7 +383,18 @@
       "settlement_id": "setl_synth_59SQWHBEF46RF7BN"
     },
     "difficulty": "ADVERSARIAL",
-    "split": "validation"
+    "split": "train"
+  },
+  "bl_setl_synth_5DNWNGUCZH9IER7U": {
+    "bank_line_id": "bl_setl_synth_5DNWNGUCZH9IER7U",
+    "correct_match": {
+      "order_ids": [
+        "order_synth_00313"
+      ],
+      "settlement_id": "setl_synth_5DNWNGUCZH9IER7U"
+    },
+    "difficulty": "ADVERSARIAL",
+    "split": "train"
   },
   "bl_setl_synth_5E5IZ31YRUJOQW5D": {
     "bank_line_id": "bl_setl_synth_5E5IZ31YRUJOQW5D",
@@ -482,7 +460,18 @@
       "settlement_id": "setl_synth_68AU9DKBPVWZOPHG"
     },
     "difficulty": "MEDIUM",
-    "split": "holdout"
+    "split": "train"
+  },
+  "bl_setl_synth_6CVBPHVGNQGMJMBU": {
+    "bank_line_id": "bl_setl_synth_6CVBPHVGNQGMJMBU",
+    "correct_match": {
+      "order_ids": [
+        "order_synth_00303"
+      ],
+      "settlement_id": "setl_synth_6CVBPHVGNQGMJMBU"
+    },
+    "difficulty": "ADVERSARIAL",
+    "split": "train"
   },
   "bl_setl_synth_6KVPUC8D1WJCITFO": {
     "bank_line_id": "bl_setl_synth_6KVPUC8D1WJCITFO",
@@ -537,7 +526,7 @@
       "settlement_id": "setl_synth_6ULM9KGZVK2JWUUX"
     },
     "difficulty": "HARD",
-    "split": "train"
+    "split": "holdout"
   },
   "bl_setl_synth_6UU13I59SOJUV0GY": {
     "bank_line_id": "bl_setl_synth_6UU13I59SOJUV0GY",
@@ -571,6 +560,17 @@
     },
     "difficulty": "EASY",
     "split": "train"
+  },
+  "bl_setl_synth_7KATQYDSHLV76MF4": {
+    "bank_line_id": "bl_setl_synth_7KATQYDSHLV76MF4",
+    "correct_match": {
+      "order_ids": [
+        "order_synth_00317"
+      ],
+      "settlement_id": "setl_synth_7KATQYDSHLV76MF4"
+    },
+    "difficulty": "ADVERSARIAL",
+    "split": "holdout"
   },
   "bl_setl_synth_7L8V1ZOCFI4O6L1F": {
     "bank_line_id": "bl_setl_synth_7L8V1ZOCFI4O6L1F",
@@ -671,6 +671,17 @@
     "difficulty": "EASY",
     "split": "train"
   },
+  "bl_setl_synth_8H0IMJYJCMRSEZYT": {
+    "bank_line_id": "bl_setl_synth_8H0IMJYJCMRSEZYT",
+    "correct_match": {
+      "order_ids": [
+        "order_synth_00313"
+      ],
+      "settlement_id": "setl_synth_8H0IMJYJCMRSEZYT"
+    },
+    "difficulty": "ADVERSARIAL",
+    "split": "holdout"
+  },
   "bl_setl_synth_8IMOE0SY5YPUPLVQ": {
     "bank_line_id": "bl_setl_synth_8IMOE0SY5YPUPLVQ",
     "correct_match": {
@@ -735,7 +746,7 @@
       "settlement_id": "setl_synth_98V341ONX0GU4BJ3"
     },
     "difficulty": "HARD",
-    "split": "train"
+    "split": "validation"
   },
   "bl_setl_synth_9DDE3CUP8IJL2Z0L": {
     "bank_line_id": "bl_setl_synth_9DDE3CUP8IJL2Z0L",
@@ -768,7 +779,7 @@
       "settlement_id": "setl_synth_9K8YQK94DNMKZA3O"
     },
     "difficulty": "EASY",
-    "split": "train"
+    "split": "validation"
   },
   "bl_setl_synth_9M96ZPXVPBL9OT7T": {
     "bank_line_id": "bl_setl_synth_9M96ZPXVPBL9OT7T",
@@ -867,18 +878,7 @@
       "settlement_id": "setl_synth_BGCJ1GNFIUE2WNF5"
     },
     "difficulty": "ADVERSARIAL",
-    "split": "train"
-  },
-  "bl_setl_synth_BNQBNXZU1EMTX015": {
-    "bank_line_id": "bl_setl_synth_BNQBNXZU1EMTX015",
-    "correct_match": {
-      "order_ids": [
-        "order_synth_00313"
-      ],
-      "settlement_id": "setl_synth_BNQBNXZU1EMTX015"
-    },
-    "difficulty": "ADVERSARIAL",
-    "split": "train"
+    "split": "validation"
   },
   "bl_setl_synth_C1MSY4LA5JU9BVM2": {
     "bank_line_id": "bl_setl_synth_C1MSY4LA5JU9BVM2",
@@ -979,17 +979,6 @@
     "difficulty": "EASY",
     "split": "train"
   },
-  "bl_setl_synth_D4Y89ORVSCYOZPNA": {
-    "bank_line_id": "bl_setl_synth_D4Y89ORVSCYOZPNA",
-    "correct_match": {
-      "order_ids": [
-        "order_synth_00317"
-      ],
-      "settlement_id": "setl_synth_D4Y89ORVSCYOZPNA"
-    },
-    "difficulty": "ADVERSARIAL",
-    "split": "validation"
-  },
   "bl_setl_synth_DD9FKXZUU80MB1L6": {
     "bank_line_id": "bl_setl_synth_DD9FKXZUU80MB1L6",
     "correct_match": {
@@ -1071,17 +1060,6 @@
     },
     "difficulty": "MEDIUM",
     "split": "validation"
-  },
-  "bl_setl_synth_EA7187F8TSXK6819": {
-    "bank_line_id": "bl_setl_synth_EA7187F8TSXK6819",
-    "correct_match": {
-      "order_ids": [
-        "order_synth_00316"
-      ],
-      "settlement_id": "setl_synth_EA7187F8TSXK6819"
-    },
-    "difficulty": "ADVERSARIAL",
-    "split": "train"
   },
   "bl_setl_synth_ECGZ9389YZTKKFZZ": {
     "bank_line_id": "bl_setl_synth_ECGZ9389YZTKKFZZ",
@@ -1259,17 +1237,6 @@
     "difficulty": "EASY",
     "split": "train"
   },
-  "bl_setl_synth_GGZ62FE9UPNHZX9F": {
-    "bank_line_id": "bl_setl_synth_GGZ62FE9UPNHZX9F",
-    "correct_match": {
-      "order_ids": [
-        "order_synth_00315"
-      ],
-      "settlement_id": "setl_synth_GGZ62FE9UPNHZX9F"
-    },
-    "difficulty": "ADVERSARIAL",
-    "split": "holdout"
-  },
   "bl_setl_synth_GH8RIEC4D145BM1E": {
     "bank_line_id": "bl_setl_synth_GH8RIEC4D145BM1E",
     "correct_match": {
@@ -1291,17 +1258,6 @@
     },
     "difficulty": "EASY",
     "split": "holdout"
-  },
-  "bl_setl_synth_GM5V2WWG84D4R9V4": {
-    "bank_line_id": "bl_setl_synth_GM5V2WWG84D4R9V4",
-    "correct_match": {
-      "order_ids": [
-        "order_synth_00305"
-      ],
-      "settlement_id": "setl_synth_GM5V2WWG84D4R9V4"
-    },
-    "difficulty": "ADVERSARIAL",
-    "split": "train"
   },
   "bl_setl_synth_GOX22INIWC5AMLN4": {
     "bank_line_id": "bl_setl_synth_GOX22INIWC5AMLN4",
@@ -1446,17 +1402,6 @@
       "settlement_id": "setl_synth_HOMTZZF8ADF7PCHC"
     },
     "difficulty": "EASY",
-    "split": "train"
-  },
-  "bl_setl_synth_HQR6F7QNEZW9HEYC": {
-    "bank_line_id": "bl_setl_synth_HQR6F7QNEZW9HEYC",
-    "correct_match": {
-      "order_ids": [
-        "order_synth_00303"
-      ],
-      "settlement_id": "setl_synth_HQR6F7QNEZW9HEYC"
-    },
-    "difficulty": "ADVERSARIAL",
     "split": "train"
   },
   "bl_setl_synth_HWKMY9X8SYLEMRUY": {
@@ -1679,6 +1624,28 @@
     "difficulty": "EASY",
     "split": "holdout"
   },
+  "bl_setl_synth_K7ORFQLA09LZRK79": {
+    "bank_line_id": "bl_setl_synth_K7ORFQLA09LZRK79",
+    "correct_match": {
+      "order_ids": [
+        "order_synth_00316"
+      ],
+      "settlement_id": "setl_synth_K7ORFQLA09LZRK79"
+    },
+    "difficulty": "ADVERSARIAL",
+    "split": "validation"
+  },
+  "bl_setl_synth_K8TEMPXKC5I8XOMX": {
+    "bank_line_id": "bl_setl_synth_K8TEMPXKC5I8XOMX",
+    "correct_match": {
+      "order_ids": [
+        "order_synth_00314"
+      ],
+      "settlement_id": "setl_synth_K8TEMPXKC5I8XOMX"
+    },
+    "difficulty": "ADVERSARIAL",
+    "split": "holdout"
+  },
   "bl_setl_synth_K93TYT7D5J60FKHM": {
     "bank_line_id": "bl_setl_synth_K93TYT7D5J60FKHM",
     "correct_match": {
@@ -1689,6 +1656,17 @@
     },
     "difficulty": "EASY",
     "split": "validation"
+  },
+  "bl_setl_synth_K94YXFIBLEJGUBLM": {
+    "bank_line_id": "bl_setl_synth_K94YXFIBLEJGUBLM",
+    "correct_match": {
+      "order_ids": [
+        "order_synth_00315"
+      ],
+      "settlement_id": "setl_synth_K94YXFIBLEJGUBLM"
+    },
+    "difficulty": "ADVERSARIAL",
+    "split": "train"
   },
   "bl_setl_synth_KAMUGYSM8T2SA5BN": {
     "bank_line_id": "bl_setl_synth_KAMUGYSM8T2SA5BN",
@@ -1732,7 +1710,7 @@
       "settlement_id": "setl_synth_KQVIIFRCHYP9UMYG"
     },
     "difficulty": "MEDIUM",
-    "split": "train"
+    "split": "holdout"
   },
   "bl_setl_synth_KV7MQXS6ESJ3L0XZ": {
     "bank_line_id": "bl_setl_synth_KV7MQXS6ESJ3L0XZ",
@@ -1932,17 +1910,6 @@
     "difficulty": "EASY",
     "split": "holdout"
   },
-  "bl_setl_synth_M95D0P92K38P6FVD": {
-    "bank_line_id": "bl_setl_synth_M95D0P92K38P6FVD",
-    "correct_match": {
-      "order_ids": [
-        "order_synth_00317"
-      ],
-      "settlement_id": "setl_synth_M95D0P92K38P6FVD"
-    },
-    "difficulty": "ADVERSARIAL",
-    "split": "train"
-  },
   "bl_setl_synth_MABSI9NB74X2EK3Z": {
     "bank_line_id": "bl_setl_synth_MABSI9NB74X2EK3Z",
     "correct_match": {
@@ -2064,6 +2031,17 @@
     "difficulty": "EASY",
     "split": "train"
   },
+  "bl_setl_synth_NAMLQUH50OPF060O": {
+    "bank_line_id": "bl_setl_synth_NAMLQUH50OPF060O",
+    "correct_match": {
+      "order_ids": [
+        "order_synth_00317"
+      ],
+      "settlement_id": "setl_synth_NAMLQUH50OPF060O"
+    },
+    "difficulty": "ADVERSARIAL",
+    "split": "train"
+  },
   "bl_setl_synth_NE6LOH25NSJF678K": {
     "bank_line_id": "bl_setl_synth_NE6LOH25NSJF678K",
     "correct_match": {
@@ -2084,7 +2062,7 @@
       "settlement_id": "setl_synth_NG7L4LRCER4KMUSO"
     },
     "difficulty": "MEDIUM",
-    "split": "holdout"
+    "split": "train"
   },
   "bl_setl_synth_NMBY49E7EOBJLZY1": {
     "bank_line_id": "bl_setl_synth_NMBY49E7EOBJLZY1",
@@ -2174,16 +2152,16 @@
     "difficulty": "EASY",
     "split": "holdout"
   },
-  "bl_setl_synth_OY7RP0AGA24SMUX2": {
-    "bank_line_id": "bl_setl_synth_OY7RP0AGA24SMUX2",
+  "bl_setl_synth_P1HKF286UTIOS5HR": {
+    "bank_line_id": "bl_setl_synth_P1HKF286UTIOS5HR",
     "correct_match": {
       "order_ids": [
-        "order_synth_00314"
+        "order_synth_00305"
       ],
-      "settlement_id": "setl_synth_OY7RP0AGA24SMUX2"
+      "settlement_id": "setl_synth_P1HKF286UTIOS5HR"
     },
     "difficulty": "ADVERSARIAL",
-    "split": "train"
+    "split": "holdout"
   },
   "bl_setl_synth_P4M18O1BJ9RM7PYX": {
     "bank_line_id": "bl_setl_synth_P4M18O1BJ9RM7PYX",
@@ -2326,7 +2304,7 @@
       "settlement_id": "setl_synth_R7S20CV3TLCXLVPY"
     },
     "difficulty": "EASY",
-    "split": "holdout"
+    "split": "validation"
   },
   "bl_setl_synth_R87IYOJTPK2NLT8D": {
     "bank_line_id": "bl_setl_synth_R87IYOJTPK2NLT8D",
@@ -2337,7 +2315,7 @@
       "settlement_id": "setl_synth_R87IYOJTPK2NLT8D"
     },
     "difficulty": "HARD",
-    "split": "validation"
+    "split": "train"
   },
   "bl_setl_synth_REC2JWJJ0V60XNG2": {
     "bank_line_id": "bl_setl_synth_REC2JWJJ0V60XNG2",
@@ -2348,7 +2326,7 @@
       "settlement_id": "setl_synth_REC2JWJJ0V60XNG2"
     },
     "difficulty": "HARD",
-    "split": "holdout"
+    "split": "train"
   },
   "bl_setl_synth_RR3VRHXQPVA5KW3H": {
     "bank_line_id": "bl_setl_synth_RR3VRHXQPVA5KW3H",
@@ -2547,7 +2525,7 @@
       "settlement_id": "setl_synth_TOUHYLU6K7P9MDA9"
     },
     "difficulty": "MEDIUM",
-    "split": "train"
+    "split": "holdout"
   },
   "bl_setl_synth_TQMGVU4ISOTN9UZE": {
     "bank_line_id": "bl_setl_synth_TQMGVU4ISOTN9UZE",
@@ -2569,6 +2547,17 @@
       "settlement_id": "setl_synth_TQVDZ4X1ZHQIMQOD"
     },
     "difficulty": "EASY",
+    "split": "train"
+  },
+  "bl_setl_synth_TTQU6L2INK4FK8WF": {
+    "bank_line_id": "bl_setl_synth_TTQU6L2INK4FK8WF",
+    "correct_match": {
+      "order_ids": [
+        "order_synth_00315"
+      ],
+      "settlement_id": "setl_synth_TTQU6L2INK4FK8WF"
+    },
+    "difficulty": "ADVERSARIAL",
     "split": "train"
   },
   "bl_setl_synth_TXMGTT0IAAKYTT3I": {
@@ -2767,7 +2756,7 @@
       "settlement_id": "setl_synth_VQT3G8CD31NRXD35"
     },
     "difficulty": "MEDIUM",
-    "split": "holdout"
+    "split": "train"
   },
   "bl_setl_synth_VWKSHY8NBIQUWRXZ": {
     "bank_line_id": "bl_setl_synth_VWKSHY8NBIQUWRXZ",
@@ -2967,6 +2956,17 @@
     "difficulty": "EASY",
     "split": "holdout"
   },
+  "bl_setl_synth_Y207MERBYEAWHMLV": {
+    "bank_line_id": "bl_setl_synth_Y207MERBYEAWHMLV",
+    "correct_match": {
+      "order_ids": [
+        "order_synth_00316"
+      ],
+      "settlement_id": "setl_synth_Y207MERBYEAWHMLV"
+    },
+    "difficulty": "ADVERSARIAL",
+    "split": "train"
+  },
   "bl_setl_synth_Y2REFJQIGYVZWD3K": {
     "bank_line_id": "bl_setl_synth_Y2REFJQIGYVZWD3K",
     "correct_match": {
@@ -2998,7 +2998,7 @@
       "settlement_id": "setl_synth_YBD2QE4PA8HYEXF7"
     },
     "difficulty": "EASY",
-    "split": "train"
+    "split": "validation"
   },
   "bl_setl_synth_YEQAHTHSJR0FZAUX": {
     "bank_line_id": "bl_setl_synth_YEQAHTHSJR0FZAUX",
@@ -3086,7 +3086,7 @@
       "settlement_id": "setl_synth_YQMLH13C71UD2ZDL"
     },
     "difficulty": "MEDIUM",
-    "split": "validation"
+    "split": "train"
   },
   "bl_setl_synth_YRDDP0NEC8UYO57P": {
     "bank_line_id": "bl_setl_synth_YRDDP0NEC8UYO57P",
@@ -3110,6 +3110,17 @@
     "difficulty": "EASY",
     "split": "train"
   },
+  "bl_setl_synth_YY95G5DOG8CFEFFH": {
+    "bank_line_id": "bl_setl_synth_YY95G5DOG8CFEFFH",
+    "correct_match": {
+      "order_ids": [
+        "order_synth_00314"
+      ],
+      "settlement_id": "setl_synth_YY95G5DOG8CFEFFH"
+    },
+    "difficulty": "ADVERSARIAL",
+    "split": "train"
+  },
   "bl_setl_synth_YZPD2TSXTV76T94O": {
     "bank_line_id": "bl_setl_synth_YZPD2TSXTV76T94O",
     "correct_match": {
@@ -3120,17 +3131,6 @@
     },
     "difficulty": "EASY",
     "split": "train"
-  },
-  "bl_setl_synth_Z11L6SPBNQS3QT36": {
-    "bank_line_id": "bl_setl_synth_Z11L6SPBNQS3QT36",
-    "correct_match": {
-      "order_ids": [
-        "order_synth_00313"
-      ],
-      "settlement_id": "setl_synth_Z11L6SPBNQS3QT36"
-    },
-    "difficulty": "ADVERSARIAL",
-    "split": "holdout"
   },
   "bl_setl_synth_Z2EI9212PGYME6RP": {
     "bank_line_id": "bl_setl_synth_Z2EI9212PGYME6RP",
@@ -3174,7 +3174,7 @@
       "settlement_id": "setl_synth_ZEGBL2QGV3DR2H2P"
     },
     "difficulty": "ADVERSARIAL",
-    "split": "holdout"
+    "split": "train"
   },
   "bl_setl_synth_ZHYAPDSWZP6SWK2R": {
     "bank_line_id": "bl_setl_synth_ZHYAPDSWZP6SWK2R",
@@ -3247,13 +3247,13 @@
     "bank_line_id": "bl_stray_00290",
     "correct_match": null,
     "difficulty": "HARD",
-    "split": "train"
+    "split": "holdout"
   },
   "bl_stray_00291": {
     "bank_line_id": "bl_stray_00291",
     "correct_match": null,
     "difficulty": "HARD",
-    "split": "validation"
+    "split": "holdout"
   },
   "bl_stray_00292": {
     "bank_line_id": "bl_stray_00292",

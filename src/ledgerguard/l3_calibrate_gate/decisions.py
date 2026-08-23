@@ -32,6 +32,7 @@ class Decision:
     split: str
     credit_paise: int
     resolver: str  # "L1_RULE" | "L2_LLM" (fallback-sourced; see module docstring)
+    rule_id: Optional[str]  # which L1 rule fired; None for L2/no-candidate decisions
     order_ids: list[str]
     raw_confidence: float
     reason_code: Optional[str]  # set only when no candidate was proposed at all
@@ -69,6 +70,7 @@ def build_decision_dataset(data_dir: Path) -> list[Decision]:
 
         if outcome.resolved:
             resolver = "L1_RULE"
+            rule_id = outcome.rule_id
             order_ids = outcome.order_ids
             raw_confidence = outcome.confidence or 0.0
             reason_code = None
@@ -82,6 +84,7 @@ def build_decision_dataset(data_dir: Path) -> list[Decision]:
             )
         else:
             resolver = "L2_LLM"
+            rule_id = None
             bounded_candidates = sorted(
                 (payments_by_id[pid] for pid in outcome.candidate_payment_ids if pid in payments_by_id),
                 key=lambda p: abs((value_date - p.captured_at).total_seconds()),
@@ -130,6 +133,7 @@ def build_decision_dataset(data_dir: Path) -> list[Decision]:
                 split=gt["split"],
                 credit_paise=credit_paise,
                 resolver=resolver,
+                rule_id=rule_id,
                 order_ids=order_ids,
                 raw_confidence=raw_confidence,
                 reason_code=reason_code,
