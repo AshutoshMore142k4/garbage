@@ -16,7 +16,8 @@ close:
 	$(PYTHON) -m ledgerguard.close --data-dir data/raw --db-path ledgerguard.db --audit-path audit.jsonl
 
 bench:
-	@echo "bench: not yet implemented (see phases.md Phase 9)"
+	$(PYTHON) -m benchmark.ablation
+	$(PYTHON) -m eval.metrics
 
 redteam:
 	$(PYTHON) -m eval.redteam_eval

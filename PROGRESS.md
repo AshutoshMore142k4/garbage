@@ -429,9 +429,97 @@ counts with the pre-fix rule code). Full account in `BROKE.md`.
 
 New dependency: none (this phase only uses what earlier phases already added).
 
-## Phase 9 — Ablation, Report, README
+## Phase 9 — Ablation, Report, README — NEVER CUT
 
-Status: **NOT STARTED**
+Status: **DONE** (2026-08-23)
+
+- [x] `PREREGISTRATION.md` committed **before** the first holdout ablation run: commit `adedb68`
+      (message "Phase 9: pre-register the ablation decision rule before any holdout run"),
+      verified by `git log` -- it landed on its own, before `benchmark/ablation.py` existed or
+      was ever run against holdout.
+- [x] `make bench` runs all three configs (rules-only, hybrid, llm-only) and prints the
+      **stratified** table (EASY/MEDIUM/HARD/ADVERSARIAL/Overall), plus the operational-metrics
+      table from `eval/metrics.py`.
+- [x] Δ computed on HARD+ADVERSARIAL combined; the README verdict uses only the language
+      `PREREGISTRATION.md`'s NEGATIVE band permits.
+- [x] EASY-stratum Δ reported (0.000) -- matches the pre-registered Δ≈0 prediction exactly, so
+      **no** L1 gap needed filing in `BROKE.md` for this specific criterion.
+- [x] Every number in `README.md` traceable to a single committed `make bench` output: `report.md`
+      (committed) is rendered directly from the same `run_ablation`/`run_full_pipeline_metrics`
+      calls `make bench` itself prints from, and every table in `README.md` is transcribed from
+      that file, not hand-computed separately.
+- [x] Precision on auto-posted, false auto-match rate, ECE, throughput, ₹/1k all present per
+      stratum in `eval/metrics.py`'s output (`report.md`'s "Operational metrics" table).
+- [x] Limitations section written and honest: synthetic-data gap, bounded subset-sum (plus the
+      Phase 8 `SPLIT_SETTLEMENT` finding), the small HARD/ADVERSARIAL holdout n, calibration
+      distribution, red-team construction, and the never-had-live-credentials L2/cost/FX caveats
+      -- all in `README.md`'s Limitations section.
+- [x] `REAL_VS_SIMULATED.md` updated: two new rows (red-team cases now generated; L2 responses
+      explicitly called out as fallback-served, not live-model, in every session so far) and the
+      "Current status" section brought current to end-of-Phase-9.
+- [x] `make test` passes (134 tests, 5 new in `tests/test_ablation.py`).
+- [~] "A stranger with no API keys can run `make demo` on the sample data and reproduce the
+      report" -- **not yet independently verifiable**: `make demo` is Phase 10's own deliverable
+      (`phases.md` lists it there), not built yet. What *is* true today and verified: a stranger
+      with no API keys can run `make bench && python -m eval.report` against the committed
+      `data/samples/` and get byte-for-byte the same tables `README.md` quotes -- confirmed by
+      re-running the full chain fresh immediately before this commit and diffing the numbers
+      against what's written into `README.md`. Flagged honestly rather than checked off on a
+      technicality; Phase 10 should re-verify this criterion once `make demo` exists.
+
+**The headline result -- a real, measured negative result, not a shortfall:**
+
+| Stratum | n | Rules-only F1 | Hybrid F1 | Δ | LLM-only F1 | LLM calls | ₹/1,000 |
+|---|---|---|---|---|---|---|---|
+| EASY | 49 | 1.000 | 1.000 | 0.000 | 0.000 | 0 | 0.00 |
+| MEDIUM | 2 | 1.000 | 1.000 | 0.000 | 0.000 | 0 | 0.00 |
+| HARD | 4 | 0.000 | 0.000 | 0.000 | 0.000 | 4 | 2384.49 |
+| ADVERSARIAL | 5 | 0.667 | 0.667 | 0.000 | 0.000 | 0 | 0.00 |
+| Overall | 60 | 0.964 | 0.964 | 0.000 | 0.000 | 4 | 158.97 |
+
+**Δ (HARD+ADVERSARIAL) = 0.000 → NEGATIVE band.** Rules-only and hybrid are numerically identical
+on every stratum in this holdout run -- the free rapidfuzz fallback that has served every L2 call
+in every session so far neither helps nor hurts on this dataset. Per `PREREGISTRATION.md`'s own
+binding rule, this is written into `README.md` as a negative result, not reframed as a win: "the
+deterministic layer does the work here." This was not known, guessed, or hoped for before
+`PREREGISTRATION.md` was committed -- the decision rule itself (the Δ thresholds and their
+permitted language) was transcribed verbatim from `plan.md` §24.2, fixed since Phase 0/1 planning,
+long before this dataset's stratified numbers existed to peek at.
+
+**A genuinely interesting secondary finding, reported in full rather than only summarized:**
+LLM-only (bypassing L1 entirely) scores **0.000 F1 on every single stratum, including EASY**.
+Diagnosed directly (not assumed): `fallback_triage` only ever answers when handed exactly one
+candidate payment, and the bounded candidate window it receives without L1's amount-narrowing
+typically contains 15-30 payments in this dataset (checked directly against several EASY holdout
+bank lines). This is a precise, structural property of the *free fallback specifically* -- not a
+claim about what a live Claude model would do on the same data (no session has ever had live
+credentials to test that; see `REAL_VS_SIMULATED.md`'s new L2-responses row). Reported per
+`PREREGISTRATION.md`'s own rule that LLM-only gets reported "regardless of outcome, even if it
+wins" -- here it is the opposite extreme, and that gets reported with equal honesty.
+
+**A real statistical-weight caveat, stated rather than hidden:** `data/samples`'s HARD (n=4) and
+ADVERSARIAL (n=5) holdout strata are small -- 9 records combined for the Δ computation. The
+Δ=0.000 result is exact on this committed dataset (not an estimate), but a single flipped record
+would move it several points. This was not a reason to swap in a bigger dataset after seeing the
+result (that would have violated `PREREGISTRATION.md`'s holdout discipline) -- `data/samples` is
+the one committed, stranger-reproducible dataset this phase's numbers had to come from, small
+strata and all. Recorded as a limitation in `README.md`, not smoothed over.
+
+**Scoring convention, chosen and documented before running anything (not fitted to a preferred
+outcome):** precision/recall/F1 use the standard entity-matching convention -- a wrong non-empty
+proposal counts as both a false positive and a false negative; a correctly-abstained-on
+unmatchable line is a true negative and doesn't enter the score. Written into
+`PREREGISTRATION.md` §2 and implemented identically in both `benchmark/ablation.py::score` and
+`eval/metrics.py::_metrics_for_group`.
+
+**Files:** `PREREGISTRATION.md` (own commit, first), `benchmark/ablation.py`, `eval/metrics.py`,
+`eval/report.py` (renders `report.md`/`report.html` via Jinja2, already a project dependency --
+no independent computation, only formats what `benchmark/ablation.py`/`eval/metrics.py` already
+computed), `README.md`, `docs/architecture.md` + `docs/architecture.png` (generated once via
+`docs/generate_architecture_diagram.py` and committed directly, unlike `eval/output/`'s
+regenerated-and-gitignored run charts), `REAL_VS_SIMULATED.md` (updated), `tests/test_ablation.py`.
+
+New dependency: none (jinja2 was already in `pyproject.toml`; this phase is the first to use it).
 
 ## Phase 10 — Demo & Submission
 
