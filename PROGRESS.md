@@ -139,11 +139,96 @@ New dependency: none (`rapidfuzz` was already added in Phase 0's tech-stack pypr
 
 ## Phase 4 — L2 LLM Triage
 
-Status: **NOT STARTED**
+Status: **DONE** (2026-08-23)
 
-## Phase 5 — L3 Calibration + Abstention Gate
+- [x] L2 processes only the residual set — `tests/test_l2_never_sees_resolved.py` proves the
+      residual file's bank-line-id set is exactly L1's unresolved set, disjoint from resolved.
+- [x] All required adversarial-response tests pass (`tests/test_schema_failure_abstains.py`):
+      malformed JSON, empty/truncated response, out-of-set candidate id, injected instruction in
+      narration, and (added, since it's a real current-model outcome) a safety-classifier
+      refusal — every one produces `candidate_id: None` / abstained, none crash, none "match."
+      Two positive controls (valid response; malformed-then-valid-on-retry) confirm the retry
+      path isn't just always failing closed.
+- [x] Second run of the same batch makes zero API calls — `tests/test_l2_cache.py` swaps in a
+      client that raises on any call and proves the cache hit skips it entirely.
+- [x] Spend is printed at the end of a run and visible at `/healthz` —
+      `l2_llm_triage/run.py` prints a summary and persists `data/cache/l2/last_run_spend.json`;
+      `api/app.py`'s `/healthz` now reads that file instead of a hardcoded zero.
+- [x] `make test` passes (69 tests).
 
-Status: **NOT STARTED**
+**Two deviations from plan.md's literal L2 spec, made because verified current Claude API
+behavior doesn't support what was originally written, not by choice:**
+
+1. **`temperature 0` is not available.** Current Claude models run adaptive thinking by default
+   and reject sampling parameters while it's active; disabling thinking to regain temperature
+   control has documented failure modes (stray `<thinking>`/tool-call-shaped text leaking into
+   the visible response) that would undermine the schema-validation safety net this module
+   depends on. `l2_llm_triage/client.py` instead uses a low `output_config.effort` and structured
+   JSON output, and leans on the prompt-hash response **cache** — not live sampling — for
+   cross-run reproducibility. This is not a new idea invented to paper over the gap: plan.md #20
+   already frames the cache as something that "doubles as a reproducibility guarantee," so the
+   mechanism the project actually needs was already the right one.
+2. **Model defaults to `claude-opus-5`**, per current Anthropic guidance to never downgrade to a
+   cheaper model preemptively — cost control is enforced by the budget guard aborting the run,
+   not by picking a smaller model up front. `PRICE_PER_MTOK_USD` in `client.py` is a point-in-time
+   snapshot flagged for re-verification before a large benchmark run, per plan.md #20's own
+   instruction not to assume pricing from memory.
+
+**Small necessary extension to Phase 3's (already-merged) output, not a rewrite:** L1's
+`MatchOutcome` now carries `candidate_payment_ids` on every unresolved result, and
+`matcher.write_residual()` enriches each residual line with the actual bounded candidate set
+(payment_id/order_id/net_paise/captured_at, closest-by-date first, capped at 10) instead of just
+a reason string. This is what makes "hand L2 the bounded candidate set L1 produced" (plan.md #11)
+concretely possible — Phase 3's residual output alone didn't carry enough structure for L2 to
+act on.
+
+New dependency: `anthropic` (official SDK) — the one LLM call site plan.md #11 specifies.
+
+## Phase 5 — L3 Calibration + Abstention Gate — NEVER CUT
+
+Status: **DONE** (2026-08-23)
+
+- [x] ECE reported on holdout with a reliability diagram saved to `eval/output/`:
+      `python -m eval.calibration --data-dir data/samples` → raw-confidence ECE **0.0452**,
+      calibrated ECE **0.0237** on the committed sample dataset (calibration measurably helps).
+- [x] Cost curve plotted with the chosen threshold marked:
+      `python -m eval.cost_model --data-dir data/samples` → cost-optimal threshold **0.92**
+      (selected on validation only), plotted against the holdout cost curve.
+- [x] Exception queue populated, ranked by ₹ at risk, every entry with evidence — built from the
+      *actual* holdout decisions (not a synthetic example): on the sample dataset the two
+      highest-value entries are, unprompted, the duplicate-UTR and genuine-double-settlement
+      demo-pair bank lines from Phase 2 (`plan.md` §8 J4's cold open) — same amount, both
+      correctly refused, for two different reason codes. This wasn't engineered; it's what the
+      pipeline actually produces end to end.
+- [x] Threshold value is derived from `cost_model.find_optimal_threshold`, never hardcoded.
+- [x] `make test` passes (94 tests).
+
+**Design decisions worth recording:**
+
+- The calibrator is `sklearn.linear_model.LogisticRegression` fit on the full six-feature vector
+  (`partial_rule_agreement_count`, `absolute_amount_gap_paise`, `date_skew_days`,
+  `narration_similarity_score`, `candidate_set_size`, `model_self_rated_confidence`) — never on
+  raw confidence alone, per phases.md's explicit instruction. Fit strictly on validation;
+  holdout is only ever scored, never fit on.
+- The cost model's two cost terms are **documented assumptions, not measured figures** — plan.md
+  gives no real number for either: a false AUTO_POST costs the full misallocated amount
+  (definitional, not assumed), while an ESCALATE costs a flat ₹50 analyst-review fee
+  (`ESCALATION_COST_PAISE` in `cost_model.py`, explicitly flagged in its docstring as something
+  to replace once real analyst-time data exists).
+- `gate.py` reuses `AMBIGUOUS_NARRATION_MULTI_CANDIDATE` as the reason code for "a candidate was
+  proposed but didn't clear the threshold," rather than inventing a new code — this exactly
+  matches plan.md §8 J2's own worked example ("Calibrated confidence 0.62, threshold 0.94...
+  Reason: `AMBIGUOUS_NARRATION_MULTI_CANDIDATE`").
+- Because this repo still has no live Anthropic credentials (Phases 0/4), `decisions.py` builds
+  L2's half of the training data using the **free fallback**, not a real model call. The
+  calibrator only ever sees the feature vector, so this doesn't change what's being
+  demonstrated — calibrating and gating over decisions with a real raw confidence — but it does
+  mean L2's actual raw confidences in this dataset are the fallback's, not a live model's. This
+  should be revisited once real credentials exist, to confirm the calibrator behaves the same
+  way over live-model confidences.
+
+New dependency: `matplotlib` — needed for the reliability diagram and cost-curve plots this
+phase's acceptance criteria explicitly require.
 
 ## Phase 6 — L4 Anomaly + L5 Executor + Audit
 

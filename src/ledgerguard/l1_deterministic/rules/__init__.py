@@ -59,6 +59,9 @@ class MatchOutcome:
     confidence: float | None = None
     reason_code: str | None = None
     evidence: list[str] = field(default_factory=list)
+    # Populated only when unresolved: the bounded set of candidate payment_ids L1 actually
+    # considered, so L2 (Phase 4) can be handed exactly this set and never the full ledger.
+    candidate_payment_ids: list[str] = field(default_factory=list)
 
 
 def narration_similarity_score(narration: str, known_tokens: tuple[str, ...] = KNOWN_MERCHANT_TOKENS) -> float:
@@ -117,6 +120,7 @@ def rule_single_payment_net_match(
             f"{len(matches)} candidates fit amount and date within tolerance with no dominant one: "
             + ", ".join(p.payment_id for p in matches)
         ],
+        candidate_payment_ids=[p.payment_id for p in matches],
     )
 
 
@@ -134,6 +138,7 @@ def rule_subset_sum_split_settlement(
             resolved=False,
             reason_code="SUBSET_SUM_OVER_BUDGET",
             evidence=[f"candidate pool of {len(pool)} payments exceeded the bounded subset-sum search budget"],
+            candidate_payment_ids=[pid for pid, _ in pool],
         )
     if result.found and len(result.payment_ids) > 1:
         by_id = {p.payment_id: p for p in candidates}

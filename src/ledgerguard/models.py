@@ -125,6 +125,17 @@ class GroundTruth(BaseModel):
     split: Split
 
 
+class TriageResponse(BaseModel):
+    """L2's schema-validated response shape (plan.md #11): the model may only name a
+    candidate_id from the bounded set it was given, or null. Confidence is a raw, uncalibrated
+    self-rating -- L3 (Phase 5) treats it as one input feature among several, never the answer.
+    """
+
+    candidate_id: Optional[str] = None
+    confidence: float = Field(ge=0.0, le=1.0)
+    evidence: list[str] = Field(default_factory=list)
+
+
 # ---- API boundary models (plan.md #16) ----
 
 

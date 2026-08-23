@@ -94,3 +94,27 @@ to pass the unit tests I would have written for it. That would have re-created t
 architectural misplacement with better luck instead of removing it. Cutting the rule and writing
 down exactly why is consistent with `plan.md` §6's own principle: a structural fix beats a
 patched-over guess, even when the guess would score better on a shallow test.
+
+## 2026-08-23 — Phase 4
+
+**What broke (caught before it caused damage):** `.gitignore` (written in Phase 0) listed
+`data/cache/` as ignored, under a generic "generated data" comment. Re-reading `plan.md` §20
+while building L2's response cache found this was wrong: the cache is explicitly supposed to be
+**committed** ("A rerun of the benchmark serves from cache and costs ₹0... anyone can rerun the
+benchmark without keys"). Had this gone uncorrected, every future benchmark run in a fresh clone
+would have silently required live API credentials, quietly breaking the exact reproducibility
+guarantee Phase 9's ablation depends on. Fixed by removing `data/cache/` from `.gitignore` and
+leaving a comment explaining why, before any cache files existed to be accidentally lost.
+
+**A real API-behavior gap, not a bug in this repo:** `plan.md` §11's L2 spec calls for
+`temperature 0`. Checked against the actually-installed `anthropic` SDK and current Claude API
+documentation (via the bundled `claude-api` skill) rather than assumed from training data:
+current Claude models run adaptive thinking by default and reject sampling parameters
+(temperature/top_p/top_k) while thinking is active — a 400, not a soft warning. The workaround
+of explicitly disabling thinking to regain temperature control has its own documented failure
+mode (stray `<thinking>`-tag or tool-call-shaped text leaking into otherwise-structured output),
+which would have undermined the very schema-validation abstain-path this module exists to
+guarantee. Resolved by dropping temperature control entirely, using a low `output_config.effort`
+instead, and leaning on the prompt-hash cache for reproducibility — which `plan.md` §20 already
+treats as the real reproducibility mechanism, so this isn't a new workaround bolted on, just
+using the mechanism the plan already specified for the job "temperature 0" used to do.

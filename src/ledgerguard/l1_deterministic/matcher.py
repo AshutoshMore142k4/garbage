@@ -96,6 +96,7 @@ def match_bank_line(bank_line_row: dict, index: PaymentIndex) -> MatchOutcome:
         resolved=False,
         reason_code="AMOUNT_GAP_EXCEEDS_TOLERANCE",
         evidence=[f"{len(candidates)} candidates in the lookback window; none (alone or combined) match the credit"],
+        candidate_payment_ids=[p.payment_id for p in candidates],
     )
 
 
@@ -107,14 +108,55 @@ def run_l1(bank_lines: list[dict], payments: list[LedgerPayment]) -> dict[str, M
     return results
 
 
-def write_residual(results: dict[str, MatchOutcome], out_path: Path) -> None:
+MAX_CANDIDATES_FOR_L2 = 10
+
+
+def write_residual(
+    results: dict[str, MatchOutcome],
+    bank_lines: list[dict],
+    payments: list[LedgerPayment],
+    out_path: Path,
+    max_candidates: int = MAX_CANDIDATES_FOR_L2,
+) -> None:
+    """Emits one JSON line per unresolved bank line, each carrying the bounded candidate set
+    (payment_id/order_id/net_paise/captured_at, closest-by-date first, capped at
+    `max_candidates`) that L2 (Phase 4) will be handed -- never the full ledger.
+    """
+    bank_lines_by_id = {row["id"]: row for row in bank_lines}
+    payments_by_id = {p.payment_id: p for p in payments}
+
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with open(out_path, "w", encoding="utf-8") as f:
         for bank_line_id in sorted(results):
             outcome = results[bank_line_id]
             if outcome.resolved:
                 continue
-            record = {"bank_line_id": bank_line_id, **asdict(outcome)}
+
+            bl_row = bank_lines_by_id[bank_line_id]
+            value_date = normalize_timestamp(bl_row["value_date"])
+            candidate_payments = sorted(
+                (payments_by_id[pid] for pid in outcome.candidate_payment_ids if pid in payments_by_id),
+                key=lambda p: abs((value_date - p.captured_at).total_seconds()),
+            )[:max_candidates]
+            candidates = [
+                {
+                    "payment_id": p.payment_id,
+                    "order_id": p.order_id,
+                    "net_paise": p.net_paise,
+                    "captured_at": p.captured_at.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                }
+                for p in candidate_payments
+            ]
+
+            outcome_fields = {k: v for k, v in asdict(outcome).items() if k != "candidate_payment_ids"}
+            record = {
+                "bank_line_id": bank_line_id,
+                "credit_paise": int(bl_row["credit_paise"]),
+                "narration": bl_row["narration"],
+                "value_date": bl_row["value_date"],
+                "candidates": candidates,
+                **outcome_fields,
+            }
             f.write(json.dumps(record, sort_keys=True) + "\n")
 
 
@@ -164,7 +206,7 @@ def main() -> None:
     results = run_l1(bank_lines, payments)
 
     residual_out = args.residual_out or (data_dir / "residual.jsonl")
-    write_residual(results, residual_out)
+    write_residual(results, bank_lines, payments, residual_out)
 
     overall = score_against_ground_truth(results, ground_truth)
     validation = score_against_ground_truth(results, ground_truth, split="validation")
