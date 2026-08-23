@@ -1,0 +1,19 @@
+{
+  "category_counts": {
+    "AMBIGUOUS_MULTI_CANDIDATE": 5,
+    "DATE_SKEW_BOUNDARY": 5,
+    "DUPLICATE_UTR": 10,
+    "EASY_EXACT_MATCH": 245,
+    "FEE_TAX_VARIANT": 5,
+    "GENUINE_DOUBLE_SETTLEMENT": 10,
+    "LATE_REFUND": 5,
+    "NO_MATCH_EXISTS": 5,
+    "SPLIT_SETTLEMENT": 5,
+    "TRUNCATED_NARRATION": 5
+  },
+  "demo_pair": {
+    "duplicate_utr_bank_line_id": "bl_dup_00304",
+    "genuine_double_settlement_bank_line_id": "bl_setl_synth_Z11L6SPBNQS3QT36"
+  },
+  "total_bank_lines": 300
+}

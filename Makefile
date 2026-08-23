@@ -1,15 +1,16 @@
 .PHONY: setup ingest gen close bench redteam demo test
 
 PYTHON ?= python3
+SEED ?= 42
 
 setup:
 	$(PYTHON) -m pip install -e ".[dev]"
 
 ingest:
-	@echo "ingest: not yet implemented (see phases.md Phase 2)"
+	$(PYTHON) -m ledgerguard.razorpay.ingest
 
 gen:
-	@echo "gen: not yet implemented (see phases.md Phase 2)"
+	$(PYTHON) -m data.generator --seed $(SEED) --out data/raw
 
 close:
 	@echo "close: not yet implemented (see phases.md Phase 3-6)"

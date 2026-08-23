@@ -53,7 +53,38 @@ standard companion package since `BaseSettings` moved out of `pydantic` core in 
 
 ## Phase 2 — Data + Ground Truth
 
-Status: **NOT STARTED**
+Status: **DONE** (2026-08-23)
+
+- [x] Byte-identical regeneration proven by test (`tests/test_generator.py::test_generation_is_byte_identical_for_same_seed`).
+- [x] All 10 chaos categories present, each ≥5 instances, counted in a printed summary
+      (`make gen` prints per-category counts; also written to `chaos_manifest.json`).
+- [x] Holdout contains the duplicate-UTR-vs-genuine-double-settlement matched pair (plan.md J4,
+      the demo climax): same amount, same value_date, near-identical (one-character-different)
+      narration, both forced into the holdout split.
+- [x] Sample dataset committed at `data/samples/` (300 bank lines, 160KB, well under 1MB).
+- [x] `make test` passes (24 tests); CI to be confirmed on push.
+
+**Two gaps flagged explicitly, consistent with this repo's running honesty pattern (Phase 0/1):**
+
+1. **Chaos-case taxonomy is not from `CLAUDE.md`.** `CLAUDE.md` still does not exist (flagged
+   since Phase 0). `data/generator.py`'s 10-category taxonomy (`EASY_EXACT_MATCH`,
+   `SPLIT_SETTLEMENT`, `LATE_REFUND`, `FEE_TAX_VARIANT`, `DATE_SKEW_BOUNDARY`,
+   `TRUNCATED_NARRATION`, `NO_MATCH_EXISTS`, `AMBIGUOUS_MULTI_CANDIDATE`, `DUPLICATE_UTR`,
+   `GENUINE_DOUBLE_SETTLEMENT`) is instead derived directly from cases `plan.md` itself names
+   (§2, §8 J2/J4, §12). See the module docstring for the full rationale. Reconcile against
+   `CLAUDE.md` if it is authored later with a different or additional list.
+2. **`razorpay/ingest.py` has not been run against a live account.** No credentials and no
+   network egress to razorpay.com were available in this session (same constraint as Phase 0).
+   The module is written and unit-tested against a fake client, but "creates N real test orders"
+   is unverified against the real API. Order creation is pure server-side API and should work
+   as written; getting to a *captured* payment in test mode requires completing checkout with a
+   test card, which this module cannot itself automate (documented in its own docstring) — that
+   is a discovered constraint of Razorpay's test mode, not an oversight.
+3. Settlements remain **SIMULATED** in every generated record, per the Phase 0 R1 finding —
+   `data/generator.py` always synthesizes settlements regardless of whether the order/payment
+   side came from a real ingest run or the built-in synthetic fixture.
+
+New dependency: none (Phase 2 uses only what Phase 0/1 already added).
 
 ## Phase 3 — L0 + L1 Deterministic Matcher
 
