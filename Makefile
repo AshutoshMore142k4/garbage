@@ -1,4 +1,4 @@
-.PHONY: setup ingest gen close bench redteam demo test
+.PHONY: setup ingest gen close bench redteam d1 demo test
 
 PYTHON ?= python3
 SEED ?= 42
@@ -20,6 +20,9 @@ bench:
 
 redteam:
 	$(PYTHON) -m eval.redteam_eval
+
+d1:
+	$(PYTHON) -m eval.rule_learning
 
 demo:
 	@echo "demo: not yet implemented (see phases.md Phase 10)"

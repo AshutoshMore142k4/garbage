@@ -229,3 +229,68 @@ was found, understood, and fixed with a real code change and a re-verified preci
 just a passing test; `NEAR_COLLISION_PAIR` is reported with its exact measured survival rate
 (3/15) and a concrete explanation of why closing it needs data this project doesn't have, rather
 than being hidden inside a headline "80% survival rate" number with no per-category breakdown.
+
+## 2026-08-23 — Phase 8
+
+**What broke (a real, pre-existing bug, found while checking what this dataset actually has to
+learn -- not fixed here, since it predates and is out of scope for this phase):** every single
+`SPLIT_SETTLEMENT` bank line in `data/samples` escalates instead of resolving. Diagnosed by
+running L1 against `data/samples` and inspecting the actual escalation list (not assuming the
+existing 97.6%-precision number meant every category was healthy): all 5 `SPLIT_SETTLEMENT`
+lines showed up as `AMOUNT_GAP_EXCEEDS_TOLERANCE`, their `order_ids` list length in ground truth
+matching the category's own known group sizes exactly (2, 3, 3, 4, 5). Root cause:
+`data/generator.py`'s `SPLIT_SETTLEMENT` construction draws each group member's `captured_at`
+independently from the same `rng.randint(0, 120)` day range used for every other order -- with no
+requirement that a group's members cluster together in time. `_settle()` computes the bank
+line's `value_date` from the group's *latest* member's `captured_at` alone, so a member captured
+much earlier than the latest one can end up more than the [2,4]-day tolerance window away from
+that shared `value_date` -- it never even enters `rule_subset_sum_split_settlement`'s own
+candidate pool (which itself filters by that same tolerance), so the correct group is
+structurally unreachable regardless of the search algorithm underneath it.
+
+**Confirmed this is not a Phase 7 regression:** re-ran the exact same `data/samples` scoring
+against the pre-Phase-7 version of `rule_subset_sum_split_settlement` (checked out from the merge
+commit before this session's ambiguity fix) -- identical resolution counts (288/300, same 12
+escalations). This bug has existed since Phase 2/3 and was never previously surfaced because no
+earlier phase's acceptance criteria happened to inspect `SPLIT_SETTLEMENT`'s specific escalation
+list directly.
+
+**Why this is honestly logged, not fixed:** phases.md's rule is to implement only the current
+phase; this bug lives in Phase 2's generator and Phase 3's matcher, both already merged, and
+fixing it would mean either constraining `SPLIT_SETTLEMENT`'s generation to cluster group members
+in time (a Phase 2 change) or widening `rule_subset_sum_split_settlement`'s own tolerance
+handling per-member (a Phase 3 change) -- neither is Phase 8's job, and D1's own design (below)
+already had to route around it rather than depend on it.
+
+**Why this directly shaped Phase 8's design:** it means `SPLIT_SETTLEMENT` cannot be the pattern
+D1 learns from -- a multi-order group whose members are scattered arbitrarily in time has no
+single widened-tolerance rule that generalizes safely. Checked every other chaos category's
+actual escalation behavior the same way (by running L1 and inspecting real output, not
+assuming): `TRUNCATED_NARRATION`, `FEE_TAX_VARIANT`, and `LATE_REFUND` all resolve cleanly at L1
+regardless of narration/fee-rate/refunds (none of those fields gate `rule_single_payment_net_match`
+at all); `DUPLICATE_UTR` and `GENUINE_DOUBLE_SETTLEMENT` also resolve at L1 (both halves) and are
+L4's job to veto, not L1's to avoid matching in the first place; `NO_MATCH_EXISTS` correctly never
+resolves and has no answer to learn. The *only* category that escalates with one clean,
+correct, learnable answer is `DATE_SKEW_BOUNDARY`'s "just past the [2,4]-day window" half -- so
+that is what `d1_rule_learning/propose.py` is built to generalize (a widened, narration-scoped
+date tolerance), and it is the only pattern this phase's rule-learning loop was ever going to be
+able to promote from this project's own dataset.
+
+**A second, smaller finding while tuning the 3-batch demonstration:** an early attempt sorted
+batches chronologically by `value_date` (the literal reading of "three sequential batches"). This
+produced a *rising*, not falling, invocation rate, because `SPLIT_SETTLEMENT`'s `value_date` (the
+latest group member's date -- an order statistic) skews toward the end of the 0-120 day range as
+group size grows, concentrating that category's own (already-known, unrelated-to-rule-learning)
+escalations into the last batch and swamping the real, small, genuine decline from the promoted
+DATE_SKEW rule. Fixed by batching a fixed-seed shuffle of train+validation bank lines instead --
+still fully deterministic and reproducible, and a more accurate model of "three ordinary days of
+mixed incoming traffic" than "three time-sorted slices of one history" would have been anyway.
+
+**Why the dataset itself is generated fresh, not read from `data/samples`:** measured directly
+before writing the batch driver -- `data/samples`'s 300-line fixture contains exactly 2 bank
+lines, total, across its entire train+validation+holdout split, that both escalate past L1 and
+have a single clean correct answer to learn. That's structurally incapable of ever reaching the
+`hits >= 3` promotion bar. `eval/rule_learning.py` generates its own dataset with a higher
+`chaos_min_count` (60, vs. the sample fixture's 5) specifically so the one genuinely-learnable
+pattern above has enough volume to demonstrate the loop -- disclosed directly in the module's own
+docstring and in `PROGRESS.md`, not hidden inside an unexplained parameter choice.

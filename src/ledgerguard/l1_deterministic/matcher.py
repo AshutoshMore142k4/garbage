@@ -79,7 +79,14 @@ class PaymentIndex:
         return self._payments[lo:hi]
 
 
-def match_bank_line(bank_line_row: dict, index: PaymentIndex) -> MatchOutcome:
+def match_bank_line(
+    bank_line_row: dict, index: PaymentIndex, extra_rules: tuple = ()
+) -> MatchOutcome:
+    """`extra_rules` is D1's (Phase 8) hook into the registry: learned rules, in promotion
+    order, always evaluated after both built-ins -- "built-ins always get first refusal, so a
+    learned rule can only narrow, not override, what the hand-written rules already resolve
+    confidently" (rules/__init__.py's own registry comment).
+    """
     bl = normalize_bank_line(bank_line_row)
     candidates = index.candidates_before(bl.value_date)
 
@@ -90,6 +97,11 @@ def match_bank_line(bank_line_row: dict, index: PaymentIndex) -> MatchOutcome:
     outcome = rule_subset_sum_split_settlement(bl, candidates)
     if outcome is not None:
         return outcome
+
+    for rule in extra_rules:
+        outcome = rule(bl, candidates)
+        if outcome is not None:
+            return outcome
 
     if not candidates:
         return MatchOutcome(
@@ -105,11 +117,13 @@ def match_bank_line(bank_line_row: dict, index: PaymentIndex) -> MatchOutcome:
     )
 
 
-def run_l1(bank_lines: list[dict], payments: list[LedgerPayment]) -> dict[str, MatchOutcome]:
+def run_l1(
+    bank_lines: list[dict], payments: list[LedgerPayment], extra_rules: tuple = ()
+) -> dict[str, MatchOutcome]:
     index = PaymentIndex(payments)
     results: dict[str, MatchOutcome] = {}
     for row in sorted(bank_lines, key=lambda r: r["id"]):
-        results[row["id"]] = match_bank_line(row, index)
+        results[row["id"]] = match_bank_line(row, index, extra_rules=extra_rules)
     return results
 
 
