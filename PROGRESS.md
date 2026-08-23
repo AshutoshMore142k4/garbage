@@ -88,7 +88,54 @@ New dependency: none (Phase 2 uses only what Phase 0/1 already added).
 
 ## Phase 3 — L0 + L1 Deterministic Matcher
 
-Status: **NOT STARTED**
+Status: **DONE** (2026-08-23)
+
+- [x] Rules-only accuracy measured on **validation** (not holdout) and printed by
+      `python -m ledgerguard.l1_deterministic.matcher --data-dir <dir>`.
+      At default full scale (seed=42, 3,000 bank lines): **validation resolved 596/600 (99.3%),
+      precision among resolved 99.8%.** On the smaller committed `data/samples/` (300 lines):
+      validation resolved 58/60 (96.7%), precision 96.6%. Both clear the ≥85% bar with margin.
+- [x] Residual set written to disk (`residual.jsonl`) with the reason each record was unresolved
+      (`NO_CANDIDATE_FOUND`, `AMOUNT_GAP_EXCEEDS_TOLERANCE`, `AMBIGUOUS_NARRATION_MULTI_CANDIDATE`,
+      or `SUBSET_SUM_OVER_BUDGET` — all four are exercised by tests).
+- [x] No network call occurs in L0/L1 (`tests/test_l1_no_network.py` patches `socket.socket.connect`
+      to raise and runs the full pipeline against `data/samples/`).
+- [x] `make test` passes (48 tests).
+
+**A real bug caught and fixed before committing:** the first implementation added a fourth rule,
+`rule_exact_utr_duplicate`, to resolve DUPLICATE_UTR's "reporting artifact" bank line by treating
+whichever line sorted first *alphabetically by bank-line id* as "the original." That's wrong on
+two counts, found by diagnosing an unexpectedly low precision number rather than accepting a
+passing test suite as sufficient: (1) alphabetical id order has no relationship to which credit
+is real, and for this project's own id-naming scheme it actually picked the fake one as
+"original" more often than not; (2) re-reading `phases.md` Phase 6 more carefully, duplicate-UTR
+detection is explicitly assigned to **L4 anomaly detection** ("L4 has veto power over L1"), not
+to L1 — so this rule was also scope-misplaced. It has been removed; see the module docstring in
+`src/ledgerguard/l1_deterministic/rules/__init__.py` and `BROKE.md` for the full account.
+
+**Known, intentional gaps, flagged rather than hidden:**
+
+1. **"Exact UTR" (one of plan.md §9's four named L1 rules) is not implemented.** As a
+   *positive*-matching rule it has no data to run on: the internal ledger carries no UTR field
+   (real Razorpay payments don't have one; only settlements do), and no UTR→order-group registry
+   exists yet (that only starts to exist once D1's learned rules are promoted, Phase 8). As a
+   *duplicate-detection* rule, it belongs to L4 (see the bug above). Fee/tax-adjusted amount
+   matching, the T+2 date-tolerance band, bounded subset-sum for split settlements, and
+   rapidfuzz-based narration plausibility scoring are all implemented and tested.
+2. **DUPLICATE_UTR's "duplicate" bank line is currently matched incorrectly.** Without L4
+   (Phase 6) to veto it, L1 alone matches both the real and the fake credit to the same order,
+   since it has no way yet to know only one of them is genuine. This is the single known source
+   of L1's residual precision gap and is expected to close once L4 exists — not something to
+   patch around at L1.
+3. **Chaos categories use a fixed count, not a proportion of the dataset size.**
+   `data/generator.py`'s `chaos_min_count` (default 8) doesn't scale with `total_bank_lines`, so
+   the chaos share of the dataset shrinks as size grows (e.g. ~18% chaos at 300 lines vs. ~3% at
+   3,000). This is why the full-scale resolution rate (99.2%) is noticeably higher than the
+   samples-scale one (94.7%) — it isn't L1 getting better, it's chaos becoming a smaller fraction
+   of the total. Worth revisiting before Phase 9's ablation, where the residual's difficulty
+   composition matters more than its raw size.
+
+New dependency: none (`rapidfuzz` was already added in Phase 0's tech-stack pyproject.toml).
 
 ## Phase 4 — L2 LLM Triage
 

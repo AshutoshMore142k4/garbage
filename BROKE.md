@@ -58,3 +58,39 @@ produced *identical* narrations for both scenarios (a `_flip_last_char` collisio
 have failed the "near-identical, not identical" requirement from `plan.md` J4. Caught by
 `tests/test_generator.py::test_holdout_contains_the_duplicate_vs_double_settlement_pair` before
 commit; fixed by giving the two scenarios distinct forced base narrations.
+
+## 2026-08-23 — Phase 3
+
+**What broke:** The first version of the L1 matcher added a fourth rule,
+`rule_exact_utr_duplicate`, meant to resolve the DUPLICATE_UTR chaos category's "reporting
+artifact" bank line by treating whichever of the two same-UTR bank lines was seen first (after
+sorting the batch by bank-line id) as "the real one." Running the matcher against
+`data/samples/` and diagnosing *why* precision was only 96.8% (rather than assuming a passing
+test suite meant the code was right) turned up 9 mismatches. 5 of them were the wrong half of
+the pair: the rule was flagging the *real* settlement line as the duplicate and letting the fake
+one resolve normally, because `bl_dup_00306` sorts alphabetically before `bl_setl_synth_...`
+("d" < "s") — an artifact of this project's own id-naming scheme, not a real-world signal for
+which credit is genuine.
+
+**Diagnosis:** Two separate problems, not one. (1) There is no real-world signal available here
+to say which of two identical-UTR bank lines is the genuine one — sorting by id is arbitrary and,
+worse, systematically backwards for this dataset's naming convention. (2) Re-reading `phases.md`
+Phase 6 while investigating: duplicate-UTR detection is explicitly named as an **L4 anomaly
+detection** responsibility ("L4 has veto power over L1 and L3"), not an L1 rule. The rule was
+both incorrect and in the wrong phase.
+
+**Fix:** Removed `rule_exact_utr_duplicate` entirely rather than patching its tie-break logic.
+L1 now resolves both halves of a DUPLICATE_UTR pair via ordinary amount/date matching, which
+means the fake line currently gets incorrectly matched to the same order as the real one --
+that gap is real, expected, and documented in `PROGRESS.md` Phase 3 as a known limitation to be
+closed by L4 in Phase 6, not something to solve prematurely at L1 with an unprincipled heuristic.
+Precision on `data/samples/` improved from 96.8% to 98.6% once the *backwards* half of the bug
+was removed; the remaining ~1.3% gap is exactly the four DUPLICATE_UTR duplicate lines, confirmed
+by re-diagnosing the mismatch list after the fix.
+
+**Why this is the right call, not a shortcut:** it would have been easy to "fix" the ordering
+(e.g., sort by captured-payment reference instead of bank-line id) and ship a rule that happened
+to pass the unit tests I would have written for it. That would have re-created the same
+architectural misplacement with better luck instead of removing it. Cutting the rule and writing
+down exactly why is consistent with `plan.md` §6's own principle: a structural fix beats a
+patched-over guess, even when the guess would score better on a shallow test.
