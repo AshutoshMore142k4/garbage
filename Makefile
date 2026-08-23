@@ -1,4 +1,4 @@
-.PHONY: setup ingest gen close bench redteam d1 demo test
+.PHONY: setup ingest gen close bench redteam d1 demo test snapshot api ui
 
 PYTHON ?= python3
 SEED ?= 42
@@ -27,6 +27,18 @@ d1:
 
 demo:
 	$(PYTHON) -m ledgerguard.demo
+
+snapshot:
+	$(PYTHON) -m eval.snapshot
+
+# The API the deployed UI runs against. Serves the real pipeline over the committed sample data.
+api:
+	$(PYTHON) -m uvicorn ledgerguard.api.app:app --reload --port 8000
+
+# The frontend dev server. Expects `make api` in another shell; falls back to the committed
+# snapshot when the backend isn't up, so it is usable either way.
+ui:
+	cd frontend && npm install && npm run dev
 
 test:
 	$(PYTHON) -m pytest -q

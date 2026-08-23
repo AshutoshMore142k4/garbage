@@ -1,0 +1,19 @@
+# This image serves only the Python API (see render.yaml) -- none of this belongs in it.
+.git/
+frontend/
+*.md
+docs/
+tests/
+benchmark/
+eval/output/
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+data/raw/
+*.db
+*.sqlite*
+audit.jsonl
+report.html
+report.md

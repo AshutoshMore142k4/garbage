@@ -189,6 +189,18 @@ assumptions against):
   approximation, not a live FX rate. p50 latency reports the fallback path's local compute time,
   not a real API round trip.
 
+## Live UI
+
+`frontend/` is a small React control center over the same pipeline `make close`/`make bench`
+run — a reconciliation queue, a per-decision investigation view (match signals, the authority
+policy, a gated execute button), and an evaluation page with the ablation and D1/D2 results. It
+talks to `src/ledgerguard/api/` (FastAPI), deployed separately from the UI because the project's
+dependency set doesn't fit in a serverless size limit — see `DEPLOYMENT.md` for the split, the
+cold-start handling, and everything that was actually verified before shipping it (not just
+"the build didn't error").
+
+Local dev: `make api` in one shell, `make ui` in another.
+
 ## Repository map
 
 `PROGRESS.md` and `BROKE.md` carry the full, phase-by-phase account of what was built, what broke,

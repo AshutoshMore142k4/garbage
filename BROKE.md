@@ -332,3 +332,50 @@ and grepping the contents for live-key/private-key/token patterns — not by loo
 working tree, and not by trusting `.gitignore`. Zero matches, and no `.env`/`.pem`/`.p12` was ever
 added in any commit. A secret deleted in a later commit still lives in history, which is why the
 check has to run over history rather than over `HEAD`.
+
+## 2026-08-23 — Post-submission deployment fix
+
+**What broke:** the deployed site showed nothing. Diagnosis (from repo config, since this
+environment's proxy blocks `vercel.app` the same way it blocks `razorpay.com` — Phase 0 — so the
+live site itself couldn't be fetched directly): `public/` contained only an orphaned
+`image.png`. Vercel's zero-config static detection uses a `public/` directory as the entire
+deployed output when no framework is detected, so the deploy was one image with no `index.html`
+at all — not a broken LedgerGuard page, since LedgerGuard never had a page to break. The actual
+`index.html` at the repo root was a pre-existing "Wingspan Proctor" exam mockup unrelated to this
+project (commits `ada1af6`/`e7630f2`, July 2026).
+
+**Fix:** split the deployment (Vercel serves `frontend/` only; the FastAPI backend moved to
+Render, since the project's ~320 MB dependency set doesn't fit a serverless size limit) and
+removed the orphaned files.
+
+**A second, separate bug found while verifying the fix rather than trusting it:** the
+`Dockerfile`'s `CMD` hardcoded `uvicorn ... --port 8000`. Render (like most container platforms)
+injects a `$PORT` environment variable at runtime and health-checks *that* port. A hardcoded port
+would have let the container start successfully — logs clean, process running — while the health
+check failed forever, because nothing would be listening on the port actually being probed. This
+is a failure mode that would not show up in local testing at all (nobody sets `$PORT` locally)
+and would only appear once deployed, exactly the kind of thing `phases.md` Phase 10's own
+"discovering a broken repo on submission day" failure mode is written against.
+
+**Diagnosis method, since Docker itself is not available in this environment either:** rather
+than trust the `${PORT:-8000}` shell-form fix by reading it, the same layer order the Dockerfile
+uses was reproduced directly — a clean environment with only `pyproject.toml` + `src/`, then
+`pip install -e .`, confirmed to succeed from scratch — then the server was started with
+`PORT=54321` set and `54321` was hit directly (not 8000). It answered. The original hardcoded
+version would have failed this exact check, which is the one Render's own health probe performs.
+
+**Also measured rather than assumed, since "the free tier might not have enough memory" was a
+real open question, not a formality:** peak resident memory building the full cached pipeline
+(the calibrator fit, L1 over 300 records, everything the API needs at startup) is ~172 MB via
+`resource.getrusage` — comfortably under a 512 MB free-tier ceiling. Guessed from library sizes
+(scipy+pandas+sklearn+numpy alone measure ~284 MB *on disk*), this could easily have looked
+alarming; measuring the actual resident set at runtime is what settled it.
+
+**What could not be verified, and is stated as such rather than guessed:** whether `render.yaml`
+matches Render's current Blueprint-spec schema exactly. Render's own documentation is blocked by
+this environment's egress proxy — confirmed by attempting the fetch and getting the same
+`EGRESS_BLOCKED` class of error this project has hit against `razorpay.com` (Phase 0) throughout.
+`DEPLOYMENT.md` states this plainly and gives the fallback: Render's dashboard can create a
+Docker-based Web Service by hand, pointing at the repo's `Dockerfile` directly, with no
+Blueprint file required — sidestepping the one part that couldn't be checked against a live
+source.
