@@ -17,7 +17,10 @@ ResolverType = Literal["L1_RULE", "L2_LLM", "L4_ANOMALY", "ABSTAIN"]
 # plan.md #15 match_decisions.action
 ActionType = Literal["AUTO_POST", "ESCALATE", "FLAG_ANOMALY"]
 
-# phases.md Phase 5 "closed enum" -- L4 anomaly reason codes (Phase 6) extend this set later.
+# phases.md Phase 5's original closed enum, extended here in Phase 6 with L4's anomaly codes
+# per that same comment's own anticipation. The four new codes below map 1:1 to phases.md Phase
+# 6's task list: "duplicate UTR, genuine double-settlement (distinct reason code), missing
+# settlement, fee/tax outside contract band."
 ReasonCode = Literal[
     "AMBIGUOUS_NARRATION_MULTI_CANDIDATE",
     "SUBSET_SUM_OVER_BUDGET",
@@ -25,6 +28,10 @@ ReasonCode = Literal[
     "NO_CANDIDATE_FOUND",
     "SCHEMA_VALIDATION_FAILED",
     "BUDGET_EXHAUSTED",
+    "DUPLICATE_UTR",
+    "GENUINE_DOUBLE_SETTLEMENT",
+    "MISSING_SETTLEMENT",
+    "FEE_TAX_CONTRACT_VIOLATION",
 ]
 
 # plan.md #15 learned_rules.status

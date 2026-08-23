@@ -85,6 +85,16 @@ TAX_RATE_ON_FEE = 0.18  # GST-on-fee, the documented Razorpay-style contract (un
 
 DEMO_AMOUNT_PAISE = 48_200 * 100
 DEMO_VALUE_DATE = BASE_DATE + timedelta(days=60)
+# _settle()'s defaults are settle_offset_days=2, bank_delay_days=0, so captured_at + 2 days must
+# equal DEMO_VALUE_DATE for L1's date-tolerance rule to actually match the demo pair -- forcing
+# only the value_date (as an earlier version of this file did) while leaving the underlying
+# order/payment's captured_at randomly drawn could put it *after* the forced value_date,
+# making the demo pair structurally unmatchable. See BROKE.md, Phase 6.
+# _make_order_payment additionally offsets captured_at by 1-30 minutes past `forced_created` (to
+# look like a real capture timestamp), so this constant needs a >=30-minute safety margin below
+# the exact 2-day mark or that offset alone pushes captured_at under the MIN_SETTLEMENT_DAYS
+# boundary. See BROKE.md, Phase 6 (second bug found in the same fix).
+DEMO_CAPTURED_AT = DEMO_VALUE_DATE - timedelta(days=2, minutes=45)
 _MERCHANT_TOKENS = ("ACMEENTERP", "GLOBALTRADE", "SUNRISEMART", "APEXRETAIL", "NORTHSTARCO")
 
 
@@ -125,11 +135,15 @@ def _flip_last_char(s: str) -> str:
 
 
 def _make_order_payment(
-    rng: random.Random, idx: int, amount_paise: int, fee_rate: float = FEE_RATE
+    rng: random.Random,
+    idx: int,
+    amount_paise: int,
+    fee_rate: float = FEE_RATE,
+    forced_created: datetime | None = None,
 ) -> tuple[Order, Payment]:
     order_id = f"order_synth_{idx:05d}"
     payment_id = f"pay_synth_{idx:05d}"
-    created = BASE_DATE + timedelta(days=rng.randint(0, 120), minutes=rng.randint(0, 1439))
+    created = forced_created or (BASE_DATE + timedelta(days=rng.randint(0, 120), minutes=rng.randint(0, 1439)))
     # Percentage arithmetic is transiently float; the stored field is always the rounded int
     # paise value below -- no float ever lands in a model field (plan.md Phase 1 money rule).
     fee_paise = round(amount_paise * fee_rate)
@@ -350,7 +364,9 @@ def generate(
     for i in range(chaos_min_count):
         is_demo = i == 0
         amount = DEMO_AMOUNT_PAISE if is_demo else rng.randint(1_00_000, 5_00_000)
-        order, payment = _make_order_payment(rng, next_idx(), amount)
+        order, payment = _make_order_payment(
+            rng, next_idx(), amount, forced_created=DEMO_CAPTURED_AT if is_demo else None
+        )
         orders.append(order)
         payments.append(payment)
         settlement, bank_line = _settle(
@@ -382,7 +398,9 @@ def generate(
     for i in range(chaos_min_count):
         is_demo = i == 0
         amount = DEMO_AMOUNT_PAISE if is_demo else rng.randint(1_00_000, 5_00_000)
-        order, payment = _make_order_payment(rng, next_idx(), amount)
+        order, payment = _make_order_payment(
+            rng, next_idx(), amount, forced_created=DEMO_CAPTURED_AT if is_demo else None
+        )
         orders.append(order)
         payments.append(payment)
         settlement_1, bank_line_1 = _settle(

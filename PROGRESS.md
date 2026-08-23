@@ -232,7 +232,64 @@ phase's acceptance criteria explicitly require.
 
 ## Phase 6 — L4 Anomaly + L5 Executor + Audit
 
-Status: **NOT STARTED**
+Status: **DONE** (2026-08-23)
+
+- [x] Rerun produces zero double-posts, proven by test: `tests/test_idempotency.py` runs
+      `ledgerguard.close.run_close` on the same `batch_id` twice and asserts the audit file is
+      **byte-identical** and `match_decisions` gains **zero new rows** the second time.
+- [x] Authority policy enforced and unit-tested (`tests/test_authority_policy.py`): amounts over
+      `AUTHORITY_LIMIT_PAISE` never auto-post even when the gate itself said AUTO_POST.
+- [x] `audit.jsonl` line count equals total decision count: verified directly in
+      `tests/test_idempotency.py`, and on the full sample dataset via `make close`
+      (300 decisions → 300 audit lines).
+- [x] Both twin cases (the Phase 2 demo pair) correctly refused with **distinct** reason codes:
+      confirmed both as a unit test (`tests/test_anomaly_veto.py`) and by directly querying the
+      DB after a real `make close` run — `DUPLICATE_UTR` / `FLAG_ANOMALY` for one line,
+      `GENUINE_DOUBLE_SETTLEMENT` / `FLAG_ANOMALY` for the other, neither `AUTO_POST`.
+  - `python -m ledgerguard.close` on the sample dataset: **198 AUTO_POST, 77 ESCALATE,
+    25 FLAG_ANOMALY** (300 total, matching the decision count).
+- [x] `make test` passes (116 tests).
+
+**Two real, previously-undetected bugs in the already-merged Phase 2 generator, found and fixed
+while building this phase's anomaly detectors** (not by inspection — by running `make close`
+against the sample data and checking the demo pair's actual DB rows, since the acceptance
+criterion is specifically about *that* pair):
+
+1. The demo pair's bank lines had a **forced `value_date`** (so the duplicate-UTR and
+   genuine-double-settlement scenarios could share an identical date, per the demo's own
+   design) but the underlying order/payment's `captured_at` was left randomly drawn from
+   `data/generator.py`'s normal 0-120-day range — completely decoupled from the forced date. For
+   many seeds this puts `captured_at` *after* the bank line's `value_date`, making the demo pair
+   structurally impossible for L1 to match at all, regardless of any Phase 6 logic.
+2. After fixing (1) by forcing `captured_at` too, the pair still failed — `_make_order_payment`
+   separately adds a random 1-30 minute offset on top of the forced value to produce the actual
+   stored `captured_at`, which was enough on its own to push the gap under the T+2 tolerance
+   floor by single-digit minutes.
+   Full account of both, and the fix (a documented `DEMO_CAPTURED_AT` constant with an explicit
+   safety margin), in `BROKE.md`.
+
+**New anomaly reason codes**, extending `models.py`'s `ReasonCode` enum exactly as its Phase 5
+comment anticipated: `DUPLICATE_UTR`, `GENUINE_DOUBLE_SETTLEMENT`, `MISSING_SETTLEMENT`,
+`FEE_TAX_CONTRACT_VIOLATION`. All four detectors are implemented in `l4_anomaly/detectors.py`
+and, on the real sample dataset, all four actually fire against the chaos categories built for
+them in Phase 2 (duplicate-UTR pairs, genuine-double-settlement pairs, the never-settled
+AMBIGUOUS_MULTI_CANDIDATE decoy orders, and the FEE_TAX_VARIANT alternate-fee-rate payments) —
+not just against synthetic unit-test fixtures.
+
+**`ledgerguard/close.py`** is the full L0→L5 pipeline (`make close`'s target, previously a stub
+since Phase 0). It deliberately does **not** call `config.get_settings()` for
+`authority_limit_paise`, since that would require the Razorpay/LLM secrets this repo has never
+had in any session (Phases 0/4) just to read one non-secret numeric constant — it takes
+`authority_limit_paise` as a parameter (defaulting to `.env.example`'s value) and only reaches
+for real `Settings` opportunistically, falling back cleanly if unavailable, matching the pattern
+already used in `l2_llm_triage/run.py`.
+
+**Known, honest gap:** the fee/tax contract band (`FEE_RATE_BAND`, `TAX_RATE_ON_FEE_BAND` in
+`detectors.py`) is a documented assumption centered on the generator's own nominal rate, not a
+measured real-world merchant contract — flagged in the module docstring for whoever can supply
+the real figures.
+
+New dependency: none (this phase only uses what earlier phases already added).
 
 ## Phase 7 — D2 Red Team
 

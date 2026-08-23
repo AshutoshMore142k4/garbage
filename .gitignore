@@ -19,6 +19,11 @@ dist/
 # Generated/raw data (never commit real Razorpay data or large generated datasets)
 data/raw/
 data/samples/residual.jsonl
+data/samples/l2_results.jsonl
+
+# make close's output (a fresh DB + audit log per run, not repo content)
+/ledgerguard.db
+/audit.jsonl
 
 # NOTE: data/cache/ (L2's prompt-hash response cache) is deliberately NOT ignored -- plan.md
 # #20 requires it to be committed so a benchmark rerun costs $0 and needs no API key.

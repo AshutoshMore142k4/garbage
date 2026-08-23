@@ -118,3 +118,46 @@ guarantee. Resolved by dropping temperature control entirely, using a low `outpu
 instead, and leaning on the prompt-hash cache for reproducibility — which `plan.md` §20 already
 treats as the real reproducibility mechanism, so this isn't a new workaround bolted on, just
 using the mechanism the plan already specified for the job "temperature 0" used to do.
+
+## 2026-08-23 — Phase 6
+
+**What broke:** Building L4's anomaly detectors and then actually running `make close` against
+the committed sample dataset (rather than trusting the unit tests alone) revealed that the
+Phase 2 demo pair — the duplicate-UTR and genuine-double-settlement bank lines meant to be *the*
+demo climax (`plan.md` §8 J4, §21) — were **both silently unmatchable by L1**, not just
+correctly-flagged-as-anomalous. Querying the DB after the first `make close` run showed the
+genuine-double-settlement line landing on a generic `AMOUNT_GAP_EXCEEDS_TOLERANCE` escalation
+instead of the intended `GENUINE_DOUBLE_SETTLEMENT` anomaly flag — the right *outcome* (never
+auto-posted) for the wrong *reason* (nothing had ever proposed a match for it to veto).
+
+**Diagnosis, in two layers, both caught by re-checking real query output rather than assuming a
+passing test suite meant the demo pair worked:**
+
+1. `data/generator.py`'s demo-pair construction forces `value_date` to a fixed `DEMO_VALUE_DATE`
+   (so the two scenarios can share an identical date, which is the point of the demo), but the
+   underlying order/payment's `captured_at` was left on the normal random 0-120-day draw from
+   `BASE_DATE` — completely decoupled from the forced date. For this seed, the draw landed on
+   May 1st, nearly two months *after* the March 6th forced `value_date`. L1's date-tolerance rule
+   requires `captured_at` to precede `value_date` by 2-4 days; a payment captured *after* the
+   bank credit's value date can never pass that check, so neither demo-pair bank line could ever
+   resolve to anything, by construction.
+2. After forcing `captured_at` to `DEMO_VALUE_DATE - 2 days` to fix (1), the pair *still* failed.
+   `_make_order_payment` adds a second, independent random offset (1-30 minutes) on top of
+   whatever `created` timestamp it's given, to make the stored `captured_at` look like a real
+   capture time rather than a round number. That extra offset alone was enough to push the gap
+   below the T+2 tolerance floor by single-digit minutes — a boundary-condition bug hiding
+   immediately behind the first one.
+
+**Fix:** Added a `forced_created` parameter to `_make_order_payment` (previously it could only
+ever draw a random date) and a `DEMO_CAPTURED_AT` constant with an explicit ~45-minute safety
+margin below the exact 2-day mark, documented inline with the arithmetic so the next person
+touching this doesn't reintroduce either bug. Regenerated `data/samples/` and re-verified via a
+real `make close` run (not just unit tests) that both demo-pair lines now resolve to their
+intended, distinct reason codes and neither auto-posts.
+
+**Why this matters beyond "a test passed":** this is `plan.md`'s own stated demo climax and the
+project's core safety-property proof. A version of this repo that could pass every unit test
+while the actual demo scenario silently failed to even reach the code path meant to protect it
+would have been a much worse outcome than catching it here, at the point where it's cheap to fix
+— which is exactly why `PROGRESS.md`'s acceptance-criteria checks for this phase were verified
+against real `make close` output and a real DB query, not only against synthetic test fixtures.

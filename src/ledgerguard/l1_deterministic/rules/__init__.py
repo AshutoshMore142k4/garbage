@@ -48,6 +48,12 @@ class LedgerPayment:
     order_id: str
     net_paise: int
     captured_at: datetime
+    # Raw gross/fee/tax, kept alongside the already-netted net_paise above. Optional (default 0)
+    # so existing call sites that only care about matching (net_paise + captured_at) don't need
+    # updating; Phase 6's fee/tax contract-violation detector needs the split-out values.
+    amount_paise: int = 0
+    fee_paise: int = 0
+    tax_paise: int = 0
 
 
 @dataclass
