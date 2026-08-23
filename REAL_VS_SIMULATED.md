@@ -10,15 +10,21 @@ be mistaken for something it isn't. See `plan.md` §14/§25 and `phases.md` Phas
 | Bank statement | SYNTHETIC | SYNTHETIC | Seeded generator (`data/generator.py`, Phase 2) | Narration mangling, T+2 skew, split-settlement grouping, and the 10-category chaos taxonomy (see `data/generator.py`'s docstring — not from `CLAUDE.md`, which doesn't exist) are modelled by the generator's own assumptions, not observed real bank narrations. |
 | Internal ledger | SYNTHETIC | SYNTHETIC | Derived from the orders/payments row above (Phase 2) | Currently derived from synthetic orders, not real ones (see row 1); the ledger file format itself is invented for this project either way. |
 | Ground truth labels | SYNTHETIC | SYNTHETIC | The generator knows the answer it constructed (Phase 2) | Precision/recall/F1 computed against these labels are exact *relative to the generator's own construction*, not validated against an independent real-world reconciliation. The difficulty distribution (counts per category in `chaos_manifest.json`) is LedgerGuard's own choice, not a measured real-world distribution. |
-| Red-team cases | SYNTHETIC | not yet generated | Adversarial by construction (`data/redteam.py`, Phase 7 — not started) | The measured "adversarial survival rate" will describe robustness to *this project's own* attack suite, not a real-world attack rate. |
+| Red-team cases | SYNTHETIC | **SYNTHETIC** | Adversarial by construction (`data/redteam.py`, Phase 7 — done); generated fresh into a temp directory on each `eval/redteam_eval.py` run, never written into `data/samples/` or `data/raw/`. | The measured 80% (48/60) adversarial survival rate describes robustness to *this project's own* attack suite, not a real-world attack rate or an independently sourced corpus. |
+| Learned rules (D1) | Derived, not simulated | **Derived from simulated exceptions** | `d1_rule_learning/propose.py` generalizes a "human-resolved exception" that, in every session so far, is actually ground truth's own known-correct answer standing in for a live operator (no live operator has ever been available either — same root cause as every other SIMULATED row). | The measured invocation-decay curve (17.1%→15.0%→11.2%, Phase 8) describes this system's rule-learning *mechanism* working correctly on synthetic exceptions; it is not a claim about how quickly a real human-in-the-loop team would resolve real exceptions. |
+| L2 responses (Anthropic model output) | REAL model, live call | **SIMULATED via free rapidfuzz fallback** | Designed to call the real `anthropic` SDK (`l2_llm_triage/client.py`, schema-validated, prompt-hash cached, Phase 4) whenever `LLM_API_KEY` is configured; falls back to `l2_llm_triage/fallback.py` (rapidfuzz-only, $0, no network) whenever it isn't. No session in this project, across Phases 0-9, has ever had live Anthropic credentials or network egress to `api.anthropic.com`, so the fallback path is the *only* path ever exercised, including for every ablation/benchmark number in `README.md`. | Every "LLM invocation," "hybrid F1," and "₹ cost" figure in `README.md`/`report.md` describes this system's currently-shipped fallback-served L2 path, not a live Claude model's performance on the same holdout. The architecture (bounded candidates, schema validation, caching) is built so a real credential would need no other code change to plug in. |
 
 ## Current status (as of this commit)
 
-End of Phase 2 (`PROGRESS.md`). `data/generator.py` is built, tested, and has produced a real
-committed sample at `data/samples/` (300 bank lines, all 10 chaos categories present, the
-duplicate-UTR/genuine-double-settlement demo pair forced into holdout). `ledgerguard.razorpay.ingest`
-is built and unit-tested but has never been run live — so, plainly stated, **every row above is
-currently SIMULATED or SYNTHETIC in what's actually in this repo**, including the Orders/Payments/
-Refunds row whose *design* is REAL. Red-team cases don't exist yet (Phase 7). This file must be
-re-checked for accuracy at the end of every phase that touches data provenance, per `phases.md`
-Phase 9's requirement that it stay "current and consistent with what the README claims."
+End of Phase 9 (`PROGRESS.md`). All ten rows above have now actually been exercised at least
+once, including red-team generation (Phase 7) and rule learning (Phase 8) — but the fundamental
+picture from Phase 2 is unchanged: **every row above is currently SIMULATED or SYNTHETIC in what's
+actually in this repo**, including the Orders/Payments/Refunds row whose *design* is REAL, and
+including the L2 row, whose *design* is a live model call. `ledgerguard.razorpay.ingest` is built
+and unit-tested but has never been run live; no session has ever had Anthropic credentials either.
+The pre-registered ablation (`PREREGISTRATION.md`, `benchmark/ablation.py`) and every number
+`README.md` quotes from it inherit this: they are honest, reproducible measurements of *this
+system as actually shipped*, not of a live Razorpay account or a live Claude model. This file must
+be re-checked for accuracy at the end of every future phase that touches data provenance, per
+`phases.md` Phase 9's requirement that it stay "current and consistent with what the README
+claims."
