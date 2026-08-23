@@ -294,3 +294,41 @@ have a single clean correct answer to learn. That's structurally incapable of ev
 `chaos_min_count` (60, vs. the sample fixture's 5) specifically so the one genuinely-learnable
 pattern above has enough volume to demonstrate the loop -- disclosed directly in the module's own
 docstring and in `PROGRESS.md`, not hidden inside an unexplained parameter choice.
+
+## 2026-08-23 — Phase 10
+
+**Nothing broke in the sense of a bug** — this phase found no new defect, and saying otherwise to
+round out the log would be exactly the kind of manufactured narrative `plan.md` §24.3 exists to
+prevent. Two things are worth recording anyway, because both were caught by *checking* rather
+than assuming, which is the habit this file is really tracking.
+
+**1. `make demo` would not have been deterministic, and the reason was subtle.** The obvious
+implementation — call `run_close` against `ledgerguard.db` like `make close` does — passes on the
+first run and fails the acceptance criterion on the second. `run_close` is idempotent by design
+(Phase 6's whole thesis): a rerun of the same `batch_id` posts nothing and reports `newly posted
+0, already posted 300`. So run 1 and run 2 print different numbers, from a feature working exactly
+as intended. Caught by reasoning about it while writing the script rather than by watching the
+demo fail during a recording. Fixed by writing the demo's DB and audit log into a fresh temp
+directory per run, so every run is a first run — which also means the demo neither touches nor is
+perturbed by whatever `ledgerguard.db` a previous `make close` left in the working tree. Verified
+by running it three times and diffing (byte-identical), then pinned by
+`tests/test_demo_determinism.py`, which shells out to the real command as a subprocess three times
+rather than calling `main()` in-process.
+
+**2. The Phase 9 criterion left open as `[~]` was closed by actually doing the test, not by
+declaring it done.** "A stranger with no API keys can run `make demo` and reproduce the report"
+was honestly marked incomplete at the end of Phase 9 because `make demo` didn't exist yet. Closing
+it here meant building a real clean clone — git-tracked files only, so no `data/raw/`, which is
+what a stranger actually gets — a fresh `venv`, a real `pip install -e ".[dev]"`, and every
+command run with `ANTHROPIC_API_KEY`/`LLM_API_KEY`/`RAZORPAY_KEY_ID` explicitly unset. 137 tests
+passed and both the regenerated `report.md` and the full `make demo` output came back
+byte-identical to this machine's. `phases.md` Phase 10 names "discovering a broken repo on
+submission day" as this phase's failure mode and says the clean-clone check exists precisely to
+prevent it; doing it on a real clone rather than trusting the working tree is the entire point.
+
+**A note on the secret scan, since "scan, don't assume" is the literal wording of the criterion:**
+it was done by walking every blob in `git rev-list --objects --all` through `git cat-file --batch`
+and grepping the contents for live-key/private-key/token patterns — not by looking at the current
+working tree, and not by trusting `.gitignore`. Zero matches, and no `.env`/`.pem`/`.p12` was ever
+added in any commit. A secret deleted in a later commit still lives in history, which is why the
+check has to run over history rather than over `HEAD`.
