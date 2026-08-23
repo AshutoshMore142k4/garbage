@@ -4,16 +4,28 @@ deliberately not implemented here.
 """
 from __future__ import annotations
 
+import json
+
 from fastapi import FastAPI
 
 import ledgerguard
+from ledgerguard.l2_llm_triage.run import SPEND_STATE_PATH
 from ledgerguard.models import HealthzResponse
 
 app = FastAPI(title="LedgerGuard")
 
-# Running spend counter. Phase 4's budget_guard.py will own real accounting against
-# MAX_SPEND_USD; until L2 exists nothing spends, so this is honestly always zero.
-_budget_spent_usd = 0.0
+
+def _current_budget_spent_usd() -> float:
+    """Reads the last L2 run's persisted spend (Phase 4's run.py writes it). Zero before any
+    L2 run has ever happened -- this process doesn't track spend itself, since batch runs and
+    the API server are separate processes in this phase (no shared in-memory state).
+    """
+    if not SPEND_STATE_PATH.exists():
+        return 0.0
+    try:
+        return json.loads(SPEND_STATE_PATH.read_text(encoding="utf-8"))["last_run_spend_usd"]
+    except (json.JSONDecodeError, KeyError, OSError):
+        return 0.0
 
 
 @app.get("/healthz", response_model=HealthzResponse)
@@ -21,5 +33,5 @@ def healthz() -> HealthzResponse:
     return HealthzResponse(
         ok=True,
         version=ledgerguard.__version__,
-        budget_spent_usd=_budget_spent_usd,
+        budget_spent_usd=_current_budget_spent_usd(),
     )

@@ -139,7 +139,50 @@ New dependency: none (`rapidfuzz` was already added in Phase 0's tech-stack pypr
 
 ## Phase 4 — L2 LLM Triage
 
-Status: **NOT STARTED**
+Status: **DONE** (2026-08-23)
+
+- [x] L2 processes only the residual set — `tests/test_l2_never_sees_resolved.py` proves the
+      residual file's bank-line-id set is exactly L1's unresolved set, disjoint from resolved.
+- [x] All required adversarial-response tests pass (`tests/test_schema_failure_abstains.py`):
+      malformed JSON, empty/truncated response, out-of-set candidate id, injected instruction in
+      narration, and (added, since it's a real current-model outcome) a safety-classifier
+      refusal — every one produces `candidate_id: None` / abstained, none crash, none "match."
+      Two positive controls (valid response; malformed-then-valid-on-retry) confirm the retry
+      path isn't just always failing closed.
+- [x] Second run of the same batch makes zero API calls — `tests/test_l2_cache.py` swaps in a
+      client that raises on any call and proves the cache hit skips it entirely.
+- [x] Spend is printed at the end of a run and visible at `/healthz` —
+      `l2_llm_triage/run.py` prints a summary and persists `data/cache/l2/last_run_spend.json`;
+      `api/app.py`'s `/healthz` now reads that file instead of a hardcoded zero.
+- [x] `make test` passes (69 tests).
+
+**Two deviations from plan.md's literal L2 spec, made because verified current Claude API
+behavior doesn't support what was originally written, not by choice:**
+
+1. **`temperature 0` is not available.** Current Claude models run adaptive thinking by default
+   and reject sampling parameters while it's active; disabling thinking to regain temperature
+   control has documented failure modes (stray `<thinking>`/tool-call-shaped text leaking into
+   the visible response) that would undermine the schema-validation safety net this module
+   depends on. `l2_llm_triage/client.py` instead uses a low `output_config.effort` and structured
+   JSON output, and leans on the prompt-hash response **cache** — not live sampling — for
+   cross-run reproducibility. This is not a new idea invented to paper over the gap: plan.md #20
+   already frames the cache as something that "doubles as a reproducibility guarantee," so the
+   mechanism the project actually needs was already the right one.
+2. **Model defaults to `claude-opus-5`**, per current Anthropic guidance to never downgrade to a
+   cheaper model preemptively — cost control is enforced by the budget guard aborting the run,
+   not by picking a smaller model up front. `PRICE_PER_MTOK_USD` in `client.py` is a point-in-time
+   snapshot flagged for re-verification before a large benchmark run, per plan.md #20's own
+   instruction not to assume pricing from memory.
+
+**Small necessary extension to Phase 3's (already-merged) output, not a rewrite:** L1's
+`MatchOutcome` now carries `candidate_payment_ids` on every unresolved result, and
+`matcher.write_residual()` enriches each residual line with the actual bounded candidate set
+(payment_id/order_id/net_paise/captured_at, closest-by-date first, capped at 10) instead of just
+a reason string. This is what makes "hand L2 the bounded candidate set L1 produced" (plan.md #11)
+concretely possible — Phase 3's residual output alone didn't carry enough structure for L2 to
+act on.
+
+New dependency: `anthropic` (official SDK) — the one LLM call site plan.md #11 specifies.
 
 ## Phase 5 — L3 Calibration + Abstention Gate
 
