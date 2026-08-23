@@ -147,6 +147,26 @@ def rule_subset_sum_split_settlement(
             candidate_payment_ids=[pid for pid, _ in pool],
         )
     if result.found and len(result.payment_ids) > 1:
+        # A second, disjoint group in the same pool that also sums exactly to the credit means
+        # the DP's "first sum found" tie-break has no principled basis for preferring this group
+        # over the other -- confidently posting either would be a guess dressed up as a match.
+        # tests/test_redteam.py::PLAUSIBLE_WRONG_SUBSET_SUM is exactly this: a decoy pair sorted
+        # earlier by captured_at than the true group, which the pre-fix search picked blindly.
+        # See BROKE.md, Phase 7.
+        remaining_pool = [(pid, amt) for pid, amt in pool if pid not in set(result.payment_ids)]
+        alternate = find_subset(remaining_pool, bank_line.credit_paise)
+        if alternate.found:
+            return MatchOutcome(
+                resolved=False,
+                reason_code="AMBIGUOUS_NARRATION_MULTI_CANDIDATE",
+                evidence=[
+                    f"{len(result.payment_ids)} and {len(alternate.payment_ids)} payments form two "
+                    "disjoint groups that each sum exactly to the bank credit; no signal here "
+                    "picks a winner"
+                ],
+                candidate_payment_ids=[pid for pid, _ in pool],
+            )
+
         by_id = {p.payment_id: p for p in candidates}
         matched = [by_id[pid] for pid in result.payment_ids]
         return MatchOutcome(

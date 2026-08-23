@@ -19,7 +19,7 @@ bench:
 	@echo "bench: not yet implemented (see phases.md Phase 9)"
 
 redteam:
-	@echo "redteam: not yet implemented (see phases.md Phase 7)"
+	$(PYTHON) -m eval.redteam_eval
 
 demo:
 	@echo "demo: not yet implemented (see phases.md Phase 10)"
