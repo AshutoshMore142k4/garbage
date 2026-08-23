@@ -161,3 +161,71 @@ while the actual demo scenario silently failed to even reach the code path meant
 would have been a much worse outcome than catching it here, at the point where it's cheap to fix
 — which is exactly why `PROGRESS.md`'s acceptance-criteria checks for this phase were verified
 against real `make close` output and a real DB query, not only against synthetic test fixtures.
+
+## 2026-08-23 — Phase 7
+
+**What broke (a real bug the red team was built to find, and did):** `PLAUSIBLE_WRONG_SUBSET_SUM`
+constructs a bank credit with two disjoint groups of ledger payments that both sum exactly to it
+-- a true 3-payment group, and a decoy 2-payment group deliberately captured earlier so it sorts
+first in `PaymentIndex.candidates_before`'s ascending-by-captured_at order. Running this attack
+against the (pre-fix) pipeline showed L1's `rule_subset_sum_split_settlement` confidently
+resolving to the *decoy* group in every one of 15 cases (`Decision.correct == False` in every
+case, confirmed by direct inspection, not just by the aggregate survival number). The reason:
+`subset_sum.find_subset` is a "first sum found" search over its candidate list in list order --
+it had no notion that a different, equally-valid group might exist elsewhere in the same pool,
+so it never even considered whether its answer was unique.
+
+**Diagnosis:** This is not a hypothetical edge case dreamed up for the red team -- it is the same
+class of arbitrary-tie-break bug already found and removed once before in Phase 3
+(`rule_exact_utr_duplicate`'s alphabetical tie-break). The lesson from Phase 3 evidently didn't
+fully propagate to `subset_sum.find_subset`'s own design: a search that returns "the first way I
+found," with no check for a second way, is silently making an arbitrary choice and reporting it
+as a confident (0.93) match.
+
+**Fix:** `rule_subset_sum_split_settlement` now re-runs `find_subset` on the remaining candidate
+pool (after removing the first group's payments) whenever the first search finds a group of size
+> 1. If that second search also finds an exact-sum group, the two groups are genuinely
+indistinguishable from where this rule sits -- there is no signal available to pick a winner --
+so it now escalates (`AMBIGUOUS_NARRATION_MULTI_CANDIDATE`) instead of guessing. Re-running the
+full test suite (116 pre-existing tests) and `make` `L1`-only precision on `data/samples/`
+afterward confirmed this didn't regress ordinary split-settlement matching (precision held at
+97.6% overall / 98.3% on validation) -- the fix only changes behavior when a *second*, disjoint
+exact-sum group genuinely exists, which essentially never happens by chance with the production
+generator's continuous random amounts. Re-running the red team afterward: `PLAUSIBLE_WRONG_SUBSET_SUM`'s
+survival rate went from confidently-wrong-every-time to 15/15 correctly escalated.
+
+**What broke and was *not* fixed, honestly listed instead:** `NEAR_COLLISION_PAIR` constructs a
+stray bank credit with no real backing settlement at all, whose amount and date happen to exactly
+collide with an unrelated, genuinely-captured payment elsewhere in the ledger (narration one
+flipped character off that payment's own merchant token). `rule_single_payment_net_match` cannot
+tell this apart from a real single-candidate match -- it produces exactly the same feature
+signature (`amount_gap=0`, date within tolerance, high narration plausibility, `raw_confidence=0.97`)
+that ordinary, genuinely-correct `EASY_EXACT_MATCH` production examples produce. Measured result:
+12 of 15 cases (80%) clear L3's calibrated gate and auto-post the wrong order; L4 has no detector
+for this pattern either (it isn't a duplicate UTR, and it isn't the same order matched twice --
+it's two *different*, otherwise-unrelated orders that happen to share an amount).
+
+**Why this one is listed, not patched:** amount + date + narration matching, with no independent
+per-order reference field in the ledger (already flagged as a known gap in `PROGRESS.md`/this
+file, Phase 3), cannot distinguish a genuine settlement from a same-amount coincidence *even in
+principle* -- there is no additional signal at L1, L3, or L4 to check, because none exists in this
+data model. A "fix" that tried to paper over this with a heuristic (e.g. penalizing candidates
+whose narration wasn't a *perfect* string match) would just move the false-negative/false-positive
+trade-off around without closing the actual gap, and would likely hurt `TRUNCATED_NARRATION`'s
+legitimate matches in the process. The honest fix requires a new independent signal this project's
+data doesn't have (e.g. an order reference embedded in the real bank narration, which
+`docs/razorpay-verification.md` already flags as unconfirmed for real Razorpay settlement
+narrations) -- recorded here per `plan.md` §6/§24.3's instruction to report a real gap rather than
+manufacture a fix that only looks like one. The partial mitigation already in place is real,
+though: 3 of 15 cases (20%) *do* get caught by L3's calibrated gate, because their particular
+timing pushes the feature vector's `date_skew_days` far enough from the tolerance-window center
+that calibrated confidence falls under threshold -- this is incidental, not a designed defense
+against this specific attack, and should not be relied on.
+
+**Why this matters beyond "a test passed":** this is exactly the failure mode `phases.md` Phase 7
+warns against in the other direction -- a red team that's too weak proves nothing, but so does a
+red-team writeup that quietly omits the attack that actually worked. `PLAUSIBLE_WRONG_SUBSET_SUM`
+was found, understood, and fixed with a real code change and a re-verified precision number, not
+just a passing test; `NEAR_COLLISION_PAIR` is reported with its exact measured survival rate
+(3/15) and a concrete explanation of why closing it needs data this project doesn't have, rather
+than being hidden inside a headline "80% survival rate" number with no per-category breakdown.

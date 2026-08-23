@@ -293,7 +293,73 @@ New dependency: none (this phase only uses what earlier phases already added).
 
 ## Phase 7 — D2 Red Team
 
-Status: **NOT STARTED**
+Status: **DONE** (2026-08-23)
+
+- [x] ≥50 adversarial cases across ≥4 attack categories: `data/redteam.py` generates 60 cases
+      (15 each) across `NEAR_COLLISION_PAIR`, `PLAUSIBLE_WRONG_SUBSET_SUM`,
+      `PROMPT_INJECTION_NARRATION`, `REFUND_TIMED_TO_LOOK_PERFECT` — asserted directly by
+      `tests/test_redteam.py::test_at_least_50_cases_across_at_least_4_categories`.
+- [x] Survival rate measured and reported separately from holdout metrics: `eval/redteam_eval.py`
+      (`make redteam`) fits the calibrator/threshold on `data/samples`' own validation split
+      (never on red-team data) and evaluates red-team decisions from an entirely separate
+      directory it writes to a temp dir per run. Current measured result: **48/60 (80.0%)**
+      overall survival — `NEAR_COLLISION_PAIR` 3/15, `PLAUSIBLE_WRONG_SUBSET_SUM` 15/15,
+      `PROMPT_INJECTION_NARRATION` 15/15, `REFUND_TIMED_TO_LOOK_PERFECT` 15/15. Never touches
+      `data/samples`' or `data/raw`'s own holdout split, confirmed by
+      `tests/test_redteam.py::test_redteam_dataset_never_reuses_the_production_holdout_split`.
+- [x] The injection case provably results in ABSTAIN: `PROMPT_INJECTION_NARRATION` pairs the
+      injected narration with two payments of the exact same amount and *identical* `captured_at`
+      — a structurally tied candidate set, not just a semantically ambiguous one. `fallback_triage`
+      abstains outright whenever more than one candidate survives amount/date filtering,
+      regardless of narration content, so this is a structural property of the bounded-candidate-
+      set design, not an empirical hope that a model resists a clever prompt. Verified directly:
+      `tests/test_redteam.py::test_injection_case_provably_abstains` (15/15, 100% survival).
+- [x] Any attack that succeeds is written into `BROKE.md` and the fix is described: both findings
+      below are logged there with full diagnosis.
+- [x] `make test` passes (123 tests, 7 new).
+
+**Two real findings, not hypothetical ones — both surfaced by actually running the red team
+against the shipped pipeline and inspecting per-case results, not by trusting an aggregate
+survival number:**
+
+1. **Found and fixed:** `PLAUSIBLE_WRONG_SUBSET_SUM` broke `rule_subset_sum_split_settlement` on
+   the very first run — L1 confidently (0.93 raw confidence) resolved to a decoy 2-payment group
+   in all 15 cases instead of the true 3-payment group, because `subset_sum.find_subset`'s
+   "first sum found" search had no check for whether a different, equally-valid group existed
+   elsewhere in the same candidate pool. Fixed by searching the remaining pool for an alternate
+   exact-sum group after the first is found, and escalating (`AMBIGUOUS_NARRATION_MULTI_CANDIDATE`)
+   instead of guessing when one exists. Re-verified: `PLAUSIBLE_WRONG_SUBSET_SUM` now survives
+   15/15, and L1's precision on `data/samples/` is unchanged (97.6% overall / 98.3% validation) —
+   the fix only ever changes behavior when a genuine second exact-sum group exists, which doesn't
+   happen by chance in production's continuous random amounts. Full diagnosis in `BROKE.md`.
+2. **Found, honestly left unfixed:** `NEAR_COLLISION_PAIR` (a stray, unbacked bank credit whose
+   amount+date coincidentally collides with an unrelated real payment) clears L1, L3's calibrated
+   gate, and L4 (no detector covers "two different orders happen to share an amount") in 12/15
+   cases (80% attack success). This is a structural limit of amount+date+narration matching with
+   no independent per-order reference field in the ledger — not a bug with a code-level fix
+   available in this data model. Documented in `BROKE.md` with the specific reasoning for why a
+   heuristic patch would just move the trade-off around rather than close the gap, and what real
+   signal (an order reference in the bank narration) would actually be needed.
+
+**Scope decision:** L4 anomaly detection is intentionally excluded from `eval/redteam_eval.py`'s
+own gate/authority evaluation (`has_anomaly` always `False`) — none of the four attack categories
+targets duplicate-UTR/double-settlement/missing-settlement/fee-tax-band detection specifically,
+and folding L4 in would blur which layer a given survival/failure result is actually exercising.
+This does **not** mean L4 was ignored when deciding which attacks counted as genuine findings:
+`NEAR_COLLISION_PAIR`'s design was checked against all four L4 detectors by reading
+`l4_anomaly/detectors.py` directly to confirm none of them would catch it in the *real* `make
+close` pipeline either — reporting an 80% attack success rate for a gap that L4 already closes in
+production would have been dishonest.
+
+**Reuses `data/generator.py`'s `GeneratedDataset`/`write_dataset` unchanged**: red-team entities
+are ordinary `Order`/`Payment`/`BankLine`/`GroundTruth` objects written with the same CSV/JSON
+shape, so `build_decision_dataset` consumes a red-team directory exactly like any other. Every
+red-team case's `GroundTruth.split` is labeled `"holdout"` as a harmless placeholder —
+`models.py`'s closed `Split` Literal has no `"redteam"` value, and nothing in this phase reads
+red-team decisions by split (only by `bank_line_id`, against `RedTeamCase` records), so this
+never risks contaminating a real holdout metric.
+
+New dependency: none (this phase only uses what earlier phases already added).
 
 ## Phase 8 — D1 Rule Learning
 
