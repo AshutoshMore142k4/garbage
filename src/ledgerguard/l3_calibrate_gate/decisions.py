@@ -47,16 +47,33 @@ def _is_correct(order_ids: list[str], ground_truth_entry: dict) -> bool:
     return set(order_ids) == expected_orders
 
 
-def build_decision_dataset(data_dir: Path) -> list[Decision]:
+def build_decision_dataset(data_dir: Path, extra_rules: tuple = ()) -> list[Decision]:
+    """`extra_rules` (D1, Phase 8): promoted learned rules to try after L1's built-ins, in the
+    same firing-order-respecting way `matcher.run_l1` already applies them. Defaults to `()` so
+    every existing caller (close.py, eval/calibration.py, eval/redteam_eval.py) is unaffected.
+    """
     bank_lines = load_bank_lines(data_dir / "bank_statement.csv")
     payments = load_ledger_payments(data_dir / "internal_ledger.csv")
     ground_truth = json.loads((data_dir / "ground_truth.json").read_text())
+    return decisions_for(bank_lines, payments, ground_truth, extra_rules=extra_rules)
 
+
+def decisions_for(
+    bank_lines: list[dict],
+    payments: list,
+    ground_truth: dict[str, dict],
+    extra_rules: tuple = (),
+) -> list[Decision]:
+    """The reusable core of `build_decision_dataset`, taking already-loaded entities directly
+    instead of a directory -- lets eval/rule_learning.py (Phase 8) run this over one sequential
+    *subset* of bank lines at a time (a "batch"), against the full ledger of payments, without
+    writing each batch out to its own directory on disk first.
+    """
     payments_by_id = {p.payment_id: p for p in payments}
     bank_lines_by_id = {row["id"]: row for row in bank_lines}
     index = PaymentIndex(payments)
 
-    results = run_l1(bank_lines, payments)
+    results = run_l1(bank_lines, payments, extra_rules=extra_rules)
 
     decisions: list[Decision] = []
     for bank_line_id, outcome in results.items():
