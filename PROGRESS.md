@@ -595,3 +595,65 @@ Removing them is outside anything the plan asks for and would break that deploym
 repo pass left them alone rather than "tidying" someone else's content.
 
 New dependency: none.
+
+-----
+
+## Post-submission: deployment fix + split frontend/backend UI
+
+Not part of the original ten-phase plan — user-directed follow-up after the Vercel deployment
+was found to be showing nothing. **Supersedes a statement in Phase 10's own entry above**, which
+said the root `index.html`/`image.png`/`public/` (the pre-existing, unrelated "Wingspan Proctor"
+page) were "left alone... would break that deployment." That was true only in the absence of a
+real LedgerGuard UI to put there instead; once building one was the actual task, removing them
+was the point, not a risk. Recorded here explicitly rather than left as a silent contradiction
+between the two entries.
+
+**Root cause of the blank deploy:** `public/` contained only `image.png`. Vercel's zero-config
+static detection uses a `public/` directory as the deploy's entire output when no framework is
+detected — so the deployed site was one orphaned image with no `index.html` at all, not a broken
+LedgerGuard page.
+
+**What shipped:**
+- `frontend/` — a Vite + React + TypeScript control center: a reconciliation queue (refused
+  decisions ranked first, by rupees at risk — the exception queue's own ranking), a per-decision
+  investigation view (bank statement / payment / ledger panels, structured match signals, the
+  authority policy with pass/fail per clause, a gated *Authorize & execute* button), an audit
+  log, and an evaluation page carrying the pre-registered ablation verdict, D1's invocation
+  decay, and D2's survival rate.
+- `src/ledgerguard/api/schemas.py` + `service.py` + six routes on the existing `app.py`
+  (`/api/v1/dashboard`, `/reconciliation`, `/reconciliation/{id}`,
+  `/reconciliation/{id}/execute`, `/audit`) — reusing `build_decision_dataset`, `Calibrator`,
+  `detect_anomalies`, `authorize`, `post_decision` unchanged. No reimplementation of the
+  pipeline for the API; it runs the real one.
+- `eval/snapshot.py` (`make snapshot`) — a committed, real-pipeline-output fallback
+  (`frontend/public/snapshot.json`) the UI renders instantly, before or instead of reaching the
+  backend, so a sleeping free-tier host never shows a blank page. Always labelled `Snapshot`,
+  never presented as live.
+- `render.yaml` + a `Dockerfile` fix (see below) for the backend; `frontend/vercel.json` for the
+  frontend. Full setup and every verification step in `DEPLOYMENT.md`.
+
+**A real deployment bug found and fixed before it could ship:** the `Dockerfile`'s `CMD`
+hardcoded `--port 8000`. Render (and most container platforms) inject a `$PORT` environment
+variable at runtime and health-check *that* port, not 8000 — a hardcoded port would have let the
+container start successfully while its health check failed forever, since nothing would be
+listening on the port actually being probed. Fixed by switching to shell-form `CMD` reading
+`${PORT:-8000}`, and confirmed directly: built the same layer order the Dockerfile uses in a
+clean environment (`pyproject.toml` + `src/` only, then `pip install -e .`), started the server
+with `PORT=54321`, and hit port 54321 directly rather than assuming the fix from reading it.
+
+**Also measured rather than assumed:** peak resident memory building the full cached pipeline
+(fitting the calibrator, running L1 over 300 records) is ~172 MB — comfortably under a 512 MB
+free-tier limit, checked with `resource.getrusage`, not inferred from library sizes. `npm ci` and
+`npm run build` were run from a clean `node_modules` against the committed lockfile. The rendered
+page was screenshotted in a real headless browser at every stage (queue, investigation, both
+chart-mode ablation and D1 charts, light and dark mode, a live end-to-end `/execute` call) rather
+than trusting "the build didn't error."
+
+**Honestly left unverified:** the exact current `render.yaml` Blueprint-spec schema, since
+Render's own docs are blocked by this environment's network egress proxy — the same restriction
+this project hit against `razorpay.com` in Phase 0 and `vercel.app` throughout. `DEPLOYMENT.md`
+states this plainly and gives the fallback (create the Render service by hand, pointing at the
+verified `Dockerfile`, no Blueprint file required).
+
+New dependency: `frontend/` brings its own Node toolchain (Vite, React, TypeScript), isolated
+from the Python project. No new Python dependency — the API reuses everything already installed.

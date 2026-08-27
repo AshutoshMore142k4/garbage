@@ -1,0 +1,33 @@
+# Render deployment for the LedgerGuard FastAPI backend.
+#
+# Vercel serves the frontend (frontend/, Root Directory = "frontend"); Render serves this API.
+# The split exists because the project's dependency set measures ~320 MB installed
+# (scipy 113 + pandas 76 + sklearn 50 + numpy 45 + matplotlib 36), well past Vercel's 250 MB
+# serverless limit -- see PROGRESS.md. Render's Docker tier has no such ceiling, so the API runs
+# the real pipeline rather than a stripped-down copy of it.
+#
+# Reuses the repo's existing Dockerfile as-is (it already runs uvicorn against
+# ledgerguard.api.app:app) rather than introducing a second, drifting entrypoint.
+#
+# Free tier note: the service sleeps after ~15 minutes with no inbound traffic, and the next
+# request can take ~50s to wake it. The frontend is built to survive that -- it renders a
+# committed snapshot immediately, labelled "Snapshot", and only flips to "Live" once /healthz
+# answers. Nothing in the demo depends on this service being warm.
+services:
+  - type: web
+    name: ledgerguard-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /healthz
+    envVars:
+      # Comma-separated origins allowed to call this API from a browser. Set this to the real
+      # Vercel URL after the first frontend deploy; the default below is dev-only.
+      - key: ALLOWED_ORIGINS
+        value: "http://localhost:5173"
+      # Where the executor's SQLite ledger lives. Render's filesystem is ephemeral and the repo
+      # directory should never be written to, so this points at a writable temp path.
+      - key: LEDGERGUARD_DB_PATH
+        value: "/tmp/ledgerguard.db"
+      - key: PYTHONUNBUFFERED
+        value: "1"
