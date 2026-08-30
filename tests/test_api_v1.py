@@ -153,6 +153,33 @@ def test_investigation_signals_are_structured_not_free_text(client, demo_pair):
     assert any(s["status"] == "fail" for s in body["signals"])  # the anomaly
 
 
+def test_execute_requires_matching_key_only_when_configured(client, monkeypatch):
+    """`EXECUTE_API_KEY` unset (every other test in this file) must behave exactly as before --
+    that's `client`'s own fixture. Set, it must reject a missing/wrong header and accept the
+    right one, without changing anything else about the response shape.
+    """
+    import sys
+
+    app_module = sys.modules["ledgerguard.api.app"]
+    monkeypatch.setattr(app_module, "_execute_api_key", "secret123")
+    auto = client.get("/api/v1/reconciliation", params={"action": "AUTO_POST"}).json()["items"][0]
+    bank_line_id = auto["bank_line_id"]
+
+    no_header = client.post(f"/api/v1/reconciliation/{bank_line_id}/execute")
+    assert no_header.status_code == 401
+
+    wrong_header = client.post(
+        f"/api/v1/reconciliation/{bank_line_id}/execute", headers={"X-Execute-Key": "nope"}
+    )
+    assert wrong_header.status_code == 401
+
+    right_header = client.post(
+        f"/api/v1/reconciliation/{bank_line_id}/execute", headers={"X-Execute-Key": "secret123"}
+    )
+    assert right_header.status_code == 200
+    assert right_header.json()["authorized"] is True
+
+
 def test_api_request_path_never_imports_matplotlib():
     """matplotlib is ~36 MB and belongs to the eval/report tooling, not to serving requests.
     Pinned because an accidental import would be invisible locally and expensive in deployment.

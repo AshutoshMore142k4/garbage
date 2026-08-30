@@ -314,14 +314,61 @@ export function AuditView({ events, source }: { events: AuditEvent[]; source: Da
 export function EvaluationView({ evaluation }: { evaluation: Evaluation }) {
   const e = evaluation;
   const overall = e.operational.find((r) => r.stratum === "Overall");
+  const overallAblation = e.ablation.find((r) => r.stratum === "Overall");
   return (
     <>
       <div className="card">
-        <h2>Pre-registered ablation</h2>
+        <h2>What it refused — and why</h2>
+        <p className="sub">
+          The claim to check first isn’t a score, it’s a guarantee: nothing this system posted was
+          wrong. Everything it wasn’t sure about — including both twin-case lines, at 98.5%
+          confidence — it refused instead of guessing.
+        </p>
+        <div className="tiles" style={{ marginBottom: 16 }}>
+          <StatTile
+            k="False auto-match"
+            v={overall ? pct(overall.false_auto_match_rate) : "—"}
+            n="holdout — nothing it posted was wrong" accent="good"
+          />
+          <StatTile k="Adversarial survival" v={`${e.redteam_survived}/${e.redteam_total}`} n="own red-team suite" />
+          <StatTile k="Calibration error (ECE)" v={e.ece_calibrated.toFixed(3)} n={`from ${e.ece_raw.toFixed(3)} raw`} />
+        </div>
+        <p className="sub">
+          Holdout split only — 60 of the 300 records. The Control tab reports the same measures over
+          the full batch, so the two differ by denominator, not by method.
+        </p>
+        <div className="scroll">
+          <table>
+            <thead>
+              <tr><th>Stratum</th><th>n</th><th>Auto-match</th><th>Precision</th><th>Recall</th><th>F1</th><th>False auto-match</th></tr>
+            </thead>
+            <tbody>
+              {e.operational.map((r) => (
+                <tr key={r.stratum} className={r.stratum === "Overall" ? "total" : undefined}>
+                  <td>{r.stratum}</td><td>{r.n}</td>
+                  <td>{pct(r.auto_match_rate)}</td>
+                  <td>{pct(r.precision_auto_posted)}</td>
+                  <td>{pct(r.recall)}</td>
+                  <td>{r.f1.toFixed(2)}</td>
+                  <td>{pct(r.false_auto_match_rate)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="note">
+          The red-team suite is this project’s own construction, not an independent corpus — and one
+          of its four attack categories still succeeds 12 times in 15. That gap is a structural limit
+          of amount + date + narration matching, and is reported rather than hidden.
+        </p>
+      </div>
+
+      <div className="card">
+        <h2>Pre-registered ablation — the discipline behind that guarantee</h2>
         <p className="sub">
           The decision rule was committed to git <em>before</em> this was ever run
           (<code>PREREGISTRATION.md</code>) — so the verdict below was fixed while it was still
-          cheap to be honest about.
+          cheap to be honest about, including the possibility the LLM adds nothing measurable.
         </p>
         <AblationChart rows={e.ablation} />
 
@@ -335,10 +382,11 @@ export function EvaluationView({ evaluation }: { evaluation: Evaluation }) {
           but one flipped record would move it several points. Stated here rather than buried.
         </p>
         <p className="note">
-          LLM-only scores 0.000 across every stratum. That is a structural property of the free
-          rapidfuzz fallback serving L2 — without the deterministic layer narrowing the candidate
-          window first, it almost never has grounds to answer. It is not a measurement of a live
-          model, which this project has never had credentials to run.
+          LLM-only scores {overallAblation ? overallAblation.llm_only_f1.toFixed(3) : "—"} overall on
+          this holdout. Whether that number is near zero or not, it's a measurement of an actual L2
+          path (see <code>REAL_VS_SIMULATED.md</code> for exactly which one served this run) — the
+          deterministic layer's own job is to narrow the candidate window before anything, model or
+          fallback, has to guess.
         </p>
 
         <div className="scroll" style={{ marginTop: 16 }}>
@@ -371,47 +419,6 @@ export function EvaluationView({ evaluation }: { evaluation: Evaluation }) {
         <p className="note">
           Two separate charts on purpose: invocation rate and precision are different measures, and
           putting them on one pair of axes would invite a comparison the geometry does not support.
-        </p>
-      </div>
-
-      <div className="card">
-        <h2>Operational metrics (holdout only)</h2>
-        <p className="sub">
-          Holdout split only — 60 of the 300 records. The Control tab reports the same measures over
-          the full batch, so the two differ by denominator, not by method.
-        </p>
-        <div className="scroll">
-          <table>
-            <thead>
-              <tr><th>Stratum</th><th>n</th><th>Auto-match</th><th>Precision</th><th>Recall</th><th>F1</th><th>False auto-match</th></tr>
-            </thead>
-            <tbody>
-              {e.operational.map((r) => (
-                <tr key={r.stratum} className={r.stratum === "Overall" ? "total" : undefined}>
-                  <td>{r.stratum}</td><td>{r.n}</td>
-                  <td>{pct(r.auto_match_rate)}</td>
-                  <td>{pct(r.precision_auto_posted)}</td>
-                  <td>{pct(r.recall)}</td>
-                  <td>{r.f1.toFixed(2)}</td>
-                  <td>{pct(r.false_auto_match_rate)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <div className="tiles" style={{ marginTop: 16 }}>
-          <StatTile k="Calibration error (ECE)" v={e.ece_calibrated.toFixed(3)} n={`from ${e.ece_raw.toFixed(3)} raw`} />
-          <StatTile k="Adversarial survival" v={`${e.redteam_survived}/${e.redteam_total}`} n="own red-team suite" />
-          <StatTile
-            k="False auto-match"
-            v={overall ? pct(overall.false_auto_match_rate) : "—"}
-            n="holdout" accent="good"
-          />
-        </div>
-        <p className="note">
-          The red-team suite is this project’s own construction, not an independent corpus — and one
-          of its four attack categories still succeeds 12 times in 15. That gap is a structural limit
-          of amount + date + narration matching, and is reported rather than hidden.
         </p>
       </div>
     </>

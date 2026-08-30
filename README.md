@@ -36,9 +36,11 @@ python -m eval.report  # renders report.md + report.html from the make bench run
 
 Every command above runs against the **committed** `data/samples/` (300 seeded bank lines, all
 10 chaos categories, the duplicate-UTR/genuine-double-settlement demo pair forced into holdout)
-and needs **no API key, no network access, and no Razorpay credentials** — the L2 call site is
-served by a committed, content-hashed fallback whenever no live Anthropic credentials are present,
-which is every session this project has ever run in (see [Limitations](#limitations)).
+and needs **no API key, no network access, and no Razorpay credentials** — the L2 call site
+degrades to a committed, content-hashed free fallback whenever no LLM credential is present, and
+that is the default `make bench`/`make close`/`make demo` run on any machine. A real model *can*
+be swapped in (`l2_llm_triage/factory.py` auto-detects an Anthropic, OpenAI, or Gemini key from
+the environment) — see [Limitations](#limitations) for what that run actually measured.
 
 ## The twin case
 
@@ -175,13 +177,14 @@ assumptions against):
   need a signal this data model doesn't have (e.g., an order reference embedded in the real bank
   narration — unconfirmed for real Razorpay settlement narrations; see
   `docs/razorpay-verification.md`).
-- **L2's fallback substitutes for a live model in every session so far.** No environment this
-  project has run in has had Anthropic credentials or network egress to `api.anthropic.com`
-  (`PROGRESS.md`/`BROKE.md`, Phases 0/4). The ablation's `hybrid`/`llm-only` numbers describe this
-  system's actual, currently-shipped L2 path — not a claim about what a real Claude model would
-  measure on the same holdout. The architecture (schema validation, bounded candidate sets,
-  prompt-hash caching) is built to swap in a live call without any other change once credentials
-  exist.
+- **L2 defaults to the free fallback; the ablation's headline numbers above are from a live
+  model.** Earlier phases of this project ran with no LLM credential and, separately, believed
+  network egress to `api.anthropic.com` was unavailable — it wasn't; only the credential was
+  missing (`REAL_VS_SIMULATED.md` row 15 has the corrected account). Once a credential and the
+  `triage_fn` injection seam (`decisions.py`, `benchmark/ablation.py`) existed, the pre-registered
+  ablation was re-run against a live model (see `REAL_VS_SIMULATED.md` for exactly which provider
+  and the resulting Δ). `make close`/`make demo`/`make bench` still default to the free fallback —
+  a public demo shouldn't spend real money or vary run to run on every visitor.
 - **Cost and latency figures are estimates, not measured spend.** `eval/metrics.py` and
   `eval/rule_learning.py` reuse `client.py`'s real Anthropic pricing table, substituting a
   documented chars/4 token-count approximation for the one missing piece (a live tokenizer). The

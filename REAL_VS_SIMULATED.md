@@ -12,20 +12,34 @@ be mistaken for something it isn't. See `plan.md` §14/§25 and `phases.md` Phas
 | Ground truth labels | SYNTHETIC | SYNTHETIC | The generator knows the answer it constructed (Phase 2) | Precision/recall/F1 computed against these labels are exact *relative to the generator's own construction*, not validated against an independent real-world reconciliation. The difficulty distribution (counts per category in `chaos_manifest.json`) is LedgerGuard's own choice, not a measured real-world distribution. |
 | Red-team cases | SYNTHETIC | **SYNTHETIC** | Adversarial by construction (`data/redteam.py`, Phase 7 — done); generated fresh into a temp directory on each `eval/redteam_eval.py` run, never written into `data/samples/` or `data/raw/`. | The measured 80% (48/60) adversarial survival rate describes robustness to *this project's own* attack suite, not a real-world attack rate or an independently sourced corpus. |
 | Learned rules (D1) | Derived, not simulated | **Derived from simulated exceptions** | `d1_rule_learning/propose.py` generalizes a "human-resolved exception" that, in every session so far, is actually ground truth's own known-correct answer standing in for a live operator (no live operator has ever been available either — same root cause as every other SIMULATED row). | The measured invocation-decay curve (17.1%→15.0%→11.2%, Phase 8) describes this system's rule-learning *mechanism* working correctly on synthetic exceptions; it is not a claim about how quickly a real human-in-the-loop team would resolve real exceptions. |
-| L2 responses (Anthropic model output) | REAL model, live call | **SIMULATED via free rapidfuzz fallback** | Designed to call the real `anthropic` SDK (`l2_llm_triage/client.py`, schema-validated, prompt-hash cached, Phase 4) whenever `LLM_API_KEY` is configured; falls back to `l2_llm_triage/fallback.py` (rapidfuzz-only, $0, no network) whenever it isn't. No session in this project, across Phases 0-9, has ever had live Anthropic credentials or network egress to `api.anthropic.com`, so the fallback path is the *only* path ever exercised, including for every ablation/benchmark number in `README.md`. | Every "LLM invocation," "hybrid F1," and "₹ cost" figure in `README.md`/`report.md` describes this system's currently-shipped fallback-served L2 path, not a live Claude model's performance on the same holdout. The architecture (bounded candidates, schema validation, caching) is built so a real credential would need no other code change to plug in. |
+| L2 responses (model output) | REAL model, live call | **REAL, live call — verified** | `l2_llm_triage/factory.py` auto-detects an Anthropic, OpenAI, or Gemini credential and builds the matching client (`client.py` / `providers.py`); falls back to `l2_llm_triage/fallback.py` (rapidfuzz-only, $0, no network) when none is set. Earlier phases of this project (0-9) ran with no LLM credential and separately concluded network egress to `api.anthropic.com` was unavailable — that second belief was never actually tested and turned out to be wrong: a live `curl` to `api.anthropic.com` returns a genuine Anthropic `request_id` with a 401 for a missing key, not a network-level block. Once a credential (Gemini, in the session that ran this) and the `triage_fn` injection seam (`decisions.py`, `benchmark/ablation.py` — previously hardcoded to the fallback with no parameter) existed, all 12 of `data/samples`' real residual records were sent to a live model (`gemini-3.5-flash-lite`, $0.0016 total). It abstained on all 12, with real per-record reasoning (`data/cache/l2/*.json`, committed) — 5 are `bl_stray_*` lines with `correct_match: null` in ground truth (correctly unmatchable), and the other 7 are multi-order `SPLIT_SETTLEMENT` lines whose true answer is a *sum* of several payments, which L2's schema (name one `payment_id`, or null) cannot express in the first place. The pre-registered ablation's `hybrid` arm, re-run against this same live client (cache-hit, $0 marginal cost), reproduced Δ=0.000 exactly — because on these specific 4 holdout residual records the live model reached the identical null-candidate conclusion the fallback reached for unrelated reasons (it could only ever try when `len(candidates)==1`, which is never true here). The `llm_only` arm (a live call on all 60 holdout lines, not just the 12 real residual ones) stayed on the fallback: Gemini's free tier caps at 20 requests/day per model, exhausted mid-session on a first attempt with a different model before this one was chosen. | The pre-registered Δ=0.000 (`PREREGISTRATION.md` NEGATIVE band) is now a measurement of an actual model's reasoning on the real residual set, not an artifact of a fallback stub that is structurally incapable of answering when `len(candidates) > 1` (true for all 12 real records). It is the strongest form of the intended negative result: a live model looked at the real evidence and correctly agreed there was nothing here it could safely resolve alone. |
 | Deployed UI (`frontend/`) | N/A | **SYNTHETIC dataset, real pipeline** | The Vercel-hosted UI and the Render-hosted API (`src/ledgerguard/api/`) run the same `build_decision_dataset`/`Calibrator`/`detect_anomalies`/`authorize` code every other phase's numbers come from, over the same committed `data/samples/`. The status chip in the UI reads "Synthetic dataset · no live Razorpay connection" rather than implying a payment connection. | Anything a viewer clicks in the deployed UI (the queue, an investigation, an `/execute` call) is a real computation, not a scripted animation — but it is a real computation over synthetic data, exactly like every other number in this repo. The `/execute` endpoint performs a genuine idempotent SQLite write; that write happens on the host's ephemeral filesystem (`/tmp`), never against this repo. |
 
 ## Current status (as of this commit)
 
-End of Phase 9 (`PROGRESS.md`). All ten rows above have now actually been exercised at least
-once, including red-team generation (Phase 7) and rule learning (Phase 8) — but the fundamental
-picture from Phase 2 is unchanged: **every row above is currently SIMULATED or SYNTHETIC in what's
-actually in this repo**, including the Orders/Payments/Refunds row whose *design* is REAL, and
-including the L2 row, whose *design* is a live model call. `ledgerguard.razorpay.ingest` is built
-and unit-tested but has never been run live; no session has ever had Anthropic credentials either.
+End of Phase 9 (`PROGRESS.md`), plus one post-hackathon-review correction. Nine of the ten rows
+above are still SIMULATED or SYNTHETIC in what's actually in this repo, including the
+Orders/Payments/Refunds row whose *design* is REAL: `ledgerguard.razorpay.ingest` is built and
+unit-tested but has never been run against a live Razorpay account, and Razorpay's own domains
+are genuinely unreachable from every session this project has run in (confirmed by a direct
+`curl`, which gets a proxy-level `CONNECT tunnel failed` rather than any response from Razorpay).
+
+**Row 15 (L2 responses) is the one exception, and it flipped from SIMULATED to REAL.** The
+project's earlier claim that "no session has ever had Anthropic credentials or network egress"
+conflated two different, unverified beliefs: the credential really was always missing, but the
+network-egress half was never actually tested until this review — a direct `curl` to
+`api.anthropic.com` returns a real Anthropic error response (a 401 for the missing key), which is
+categorically different from `razorpay.com`'s proxy-level block. Once that was caught and a
+credential (Gemini, via `l2_llm_triage/factory.py`'s multi-provider auto-detection) was available,
+the actual blocker turned out to be a second, separate gap: `decisions.py` and
+`benchmark/ablation.py` imported the free fallback directly with no parameter, so `LLM_API_KEY`
+alone would have changed nothing. Both gaps are now closed, and the real 12-record residual set
+has been sent to a live model — see row 15 above for the result.
+
 The pre-registered ablation (`PREREGISTRATION.md`, `benchmark/ablation.py`) and every number
-`README.md` quotes from it inherit this: they are honest, reproducible measurements of *this
-system as actually shipped*, not of a live Razorpay account or a live Claude model. This file must
-be re-checked for accuracy at the end of every future phase that touches data provenance, per
+`README.md` quotes from it now include one arm (`hybrid`, on the real residual set) that is a
+live-model measurement, not a fallback-stub artifact; `llm_only`'s 60-calls-per-holdout-line arm
+remains fallback-served, for the free-tier daily-quota reason row 15 explains. This file must be
+re-checked for accuracy at the end of every future phase that touches data provenance, per
 `phases.md` Phase 9's requirement that it stay "current and consistent with what the README
 claims."

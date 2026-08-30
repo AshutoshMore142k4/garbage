@@ -42,3 +42,19 @@ def fallback_triage(narration: str, candidates: list[dict]) -> TriageResponse:
         confidence=0.0,
         evidence=[f"{len(candidates)} candidates; the fallback cannot disambiguate without the LLM"],
     )
+
+
+def fallback_triage_fn(bank_line: dict, candidates: list[dict]) -> tuple[TriageResponse, dict]:
+    """Adapter matching the uniform `(bank_line, candidates) -> (response, metadata)` contract
+    every real provider client's `.triage()` method also satisfies -- this is the default
+    `triage_fn` for `decisions.py`/`benchmark/ablation.py` so callers can swap in a real client
+    without a different call shape.
+    """
+    response = fallback_triage(bank_line["narration"], candidates)
+    return response, {
+        "model": "fallback_rapidfuzz",
+        "prompt_hash": None,
+        "from_cache": False,
+        "usd_cost": 0.0,
+        "abstained": response.candidate_id is None,
+    }

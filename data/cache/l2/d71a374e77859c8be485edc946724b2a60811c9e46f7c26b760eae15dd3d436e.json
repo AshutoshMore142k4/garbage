@@ -1,0 +1,10 @@
+{
+  "abstained": false,
+  "response": {
+    "candidate_id": null,
+    "confidence": 0.0,
+    "evidence": [
+      "No candidate payment has a net amount matching the bank credit of 5101085 paise."
+    ]
+  }
+}

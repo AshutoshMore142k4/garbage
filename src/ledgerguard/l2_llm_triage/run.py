@@ -1,7 +1,8 @@
 """CLI driver for L2 (phases.md Phase 4): reads L1's residual set, runs each record through
-`TriageClient` (or the free fallback), and reports the batch's resolution counts and total
-spend -- printed at the end of the run, per plan.md #19, and persisted so `/healthz` can report
-it too (api/app.py reads the same state file).
+a real provider client (Anthropic/OpenAI/Gemini, auto-detected by `factory.build_triage_client`
+from whichever credential is set -- see that module) or the free fallback, and reports the
+batch's resolution counts and total spend -- printed at the end of the run, per plan.md #19, and
+persisted so `/healthz` can report it too (api/app.py reads the same state file).
 """
 from __future__ import annotations
 
@@ -10,7 +11,6 @@ from pathlib import Path
 from typing import Any, Optional
 
 from ledgerguard.l2_llm_triage.budget_guard import BudgetExhaustedError
-from ledgerguard.l2_llm_triage.client import TriageClient
 from ledgerguard.l2_llm_triage.fallback import fallback_triage
 
 SPEND_STATE_PATH = Path("data/cache/l2/last_run_spend.json")
@@ -29,10 +29,12 @@ def _fallback_meta(response) -> dict:
 def run_l2(
     residual_path: Path,
     out_path: Path,
-    triage_client: Optional[TriageClient],
+    triage_client: Optional[Any],
 ) -> dict[str, Any]:
     """`triage_client=None` routes every record through the free fallback -- used when no LLM
-    credentials are available or the caller chooses not to spend at all.
+    credentials are available or the caller chooses not to spend at all. Any object exposing
+    `.triage(bank_line, candidates) -> (TriageResponse, metadata)` works here -- the real
+    Anthropic `TriageClient` and the OpenAI/Gemini clients in `providers.py` all do.
     """
     records = []
     with open(residual_path, encoding="utf-8") as f:
@@ -118,15 +120,12 @@ def main() -> None:
     triage_client = None
     if not args.no_llm:
         try:
-            import anthropic
-
             from ledgerguard.config import get_settings
+            from ledgerguard.l2_llm_triage.factory import build_triage_client
 
-            settings = get_settings()
-            anthropic_client = anthropic.Anthropic(api_key=settings.llm_api_key)
-            budget_guard = BudgetGuard(max_spend_usd=settings.max_spend_usd)
-            triage_client = TriageClient(messages_client=anthropic_client.messages, budget_guard=budget_guard)
-        except Exception as exc:  # missing settings/key -- degrade to the fallback, don't crash
+            triage_client, label = build_triage_client(get_settings())
+            print(f"L2: {label}" if triage_client is None else f"L2 provider: {label}")
+        except Exception as exc:  # missing settings -- degrade to the fallback, don't crash
             print(f"L2: no usable LLM credentials ({exc}); using the free fallback only.")
 
     summary = run_l2(residual_path, out_path, triage_client)
