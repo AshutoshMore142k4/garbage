@@ -16,13 +16,14 @@ would be inconsistent to introduce one here purely for a log timestamp.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Optional
 
 from ledgerguard.audit.writer import AuditWriter
 from ledgerguard.db import init_db
 from ledgerguard.l1_deterministic.matcher import load_bank_lines, load_ledger_payments
 from ledgerguard.l3_calibrate_gate.calibrator import Calibrator
 from ledgerguard.l3_calibrate_gate.cost_model import CostDecision, find_optimal_threshold
-from ledgerguard.l3_calibrate_gate.decisions import build_decision_dataset
+from ledgerguard.l3_calibrate_gate.decisions import TriageFn, build_decision_dataset
 from ledgerguard.l3_calibrate_gate.gate import GateInput, gate
 from ledgerguard.l4_anomaly.detectors import detect_anomalies
 from ledgerguard.l5_executor.authority import AuthorityInput, authorize
@@ -42,8 +43,14 @@ def run_close(
     db_path: Path,
     audit_path: Path,
     authority_limit_paise: int = DEFAULT_AUTHORITY_LIMIT_PAISE,
+    triage_fn: Optional[TriageFn] = None,
 ) -> dict:
-    decisions = build_decision_dataset(data_dir)
+    """`triage_fn` defaults to `None` (the free fallback) -- pass a real provider client's
+    `.triage` method (`l2_llm_triage/factory.py`) to have L2 answer from a live model. The CLI
+    below never does this: a public demo/API should stay deterministic and free to run on every
+    cold start, not spend real money or vary run to run on every judge's visit.
+    """
+    decisions = build_decision_dataset(data_dir, triage_fn=triage_fn)
     bank_lines = load_bank_lines(data_dir / "bank_statement.csv")
     payments = load_ledger_payments(data_dir / "internal_ledger.csv")
     bank_lines_by_id = {row["id"]: row for row in bank_lines}
@@ -98,12 +105,14 @@ def run_close(
             resolver = "L4_ANOMALY"
             rule_id = None
             model = None
+            prompt_hash = None
             reason_code = anomaly_flags[0].reason_code
             evidence = [e for flag in anomaly_flags for e in flag.evidence]
         else:
             resolver = d.resolver if d.order_ids else "ABSTAIN"
             rule_id = d.rule_id
-            model = "fallback_rapidfuzz" if d.resolver == "L2_LLM" else None
+            model = d.model
+            prompt_hash = d.prompt_hash
             reason_code = gate_outcome.reason_code
             evidence = d.evidence
 
@@ -115,7 +124,7 @@ def run_close(
             resolver=resolver,
             rule_id=rule_id,
             model=model,
-            prompt_hash=None,
+            prompt_hash=prompt_hash,
             raw_confidence=d.raw_confidence,
             calibrated_confidence=calibrated,
             threshold=threshold,

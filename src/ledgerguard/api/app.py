@@ -15,7 +15,7 @@ from __future__ import annotations
 import json
 import os
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 import ledgerguard
@@ -38,23 +38,36 @@ app = FastAPI(
     version=ledgerguard.__version__,
 )
 
-# The frontend is served from a different origin, so the browser needs this. The deployed origin
-# is not knowable from inside the repo, hence the env var.
+# The frontend is served from a different origin, so the browser needs this. `ALLOWED_ORIGINS`
+# is an exact-match allowlist (comma-separated) -- set it to the real deployed frontend URL(s)
+# once known, e.g. `ALLOWED_ORIGINS=https://ledgerguard.vercel.app`.
 #
-# The regex covers the two cases that otherwise cause a confusing "it works with curl but not in
-# the browser": any Vercel deployment (production and per-PR previews, whose hostnames are
-# generated), and local development on any port. `vite dev` serves :5173 and `vite preview`
-# serves :4173, and `localhost` and `127.0.0.1` are *different origins* to a browser -- pinning
-# one host:port would break the other three combinations.
+# The regex defaults to local development only (`vite dev`'s :5173, `vite preview`'s :4173, and
+# both `localhost`/`127.0.0.1`, which are *different origins* to a browser). It previously also
+# matched *any* `https://*.vercel.app`, which means any attacker's own Vercel deployment could
+# call this API from a browser -- narrowed here to an explicit opt-in via
+# `ALLOWED_ORIGIN_REGEX`, since Vercel preview URLs are dynamic per-PR and the exact-match
+# allowlist alone can't cover them.
 _origins = [o.strip() for o in os.environ.get("ALLOWED_ORIGINS", "").split(",") if o.strip()]
+_origin_regex = os.environ.get("ALLOWED_ORIGIN_REGEX", r"http://(localhost|127\.0\.0\.1):\d+")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_origins,
-    allow_origin_regex=r"https://[^/]*\.vercel\.app|http://(localhost|127\.0\.0\.1):\d+",
+    allow_origin_regex=_origin_regex,
     allow_credentials=False,
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
+
+# Empty by default: `/execute` is open unless a deployment sets this, matching how this repo has
+# always run (no secrets required for `make api`). Set `EXECUTE_API_KEY` to require callers to
+# send a matching `X-Execute-Key` header before this endpoint will write to the ledger.
+_execute_api_key = os.environ.get("EXECUTE_API_KEY", "")
+
+
+def _check_execute_auth(x_execute_key: str | None) -> None:
+    if _execute_api_key and x_execute_key != _execute_api_key:
+        raise HTTPException(status_code=401, detail="missing or invalid X-Execute-Key header")
 
 
 def _current_budget_spent_usd() -> float:
@@ -107,10 +120,13 @@ def investigation(bank_line_id: str) -> InvestigationResponse:
 
 
 @app.post("/api/v1/reconciliation/{bank_line_id}/execute", response_model=ExecuteResponse)
-def execute(bank_line_id: str) -> ExecuteResponse:
+def execute(bank_line_id: str, x_execute_key: str | None = Header(default=None)) -> ExecuteResponse:
     """Bounded action. The authority policy decides; only an AUTO_POST verdict reaches the
-    ledger, and the insert is idempotent, so a repeated call posts once.
+    ledger, and the insert is idempotent, so a repeated call posts once. Gated behind
+    `EXECUTE_API_KEY` when that env var is set (see above) -- unset, this is unchanged from how
+    every prior version of this endpoint ran.
     """
+    _check_execute_auth(x_execute_key)
     state = get_state()
     if bank_line_id not in state.states:
         raise HTTPException(status_code=404, detail=f"unknown bank line {bank_line_id}")

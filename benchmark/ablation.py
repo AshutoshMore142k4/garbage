@@ -5,9 +5,9 @@ Three configs, same holdout, stratified by difficulty (EASY/MEDIUM/HARD/ADVERSAR
 
 - **rules-only**: L1's built-in rules only. Whatever L1 doesn't resolve counts as "no match
   predicted" -- L2 is never consulted.
-- **hybrid**: the full shipped pipeline -- L1 first, L2 (fallback-served; see module docstring in
-  `l3_calibrate_gate/decisions.py` for why there's no live model call in this environment) on
-  whatever L1 leaves unresolved.
+- **hybrid**: the full shipped pipeline -- L1 first, then L2 on whatever L1 leaves unresolved.
+  L2 defaults to the free fallback; `main()` below auto-detects a real Anthropic/OpenAI/Gemini
+  credential (`l2_llm_triage/factory.py`) and uses it instead when one is set.
 - **llm-only**: L1 is skipped entirely. Every bank line gets the same bounded candidate window
   L1 would have computed (`PaymentIndex.candidates_before`, unchanged) and goes straight to L2.
 
@@ -30,7 +30,8 @@ from ledgerguard.l1_deterministic.matcher import (
     load_ledger_payments,
     run_l1,
 )
-from ledgerguard.l2_llm_triage.fallback import fallback_triage
+from ledgerguard.l2_llm_triage.fallback import fallback_triage_fn
+from ledgerguard.l3_calibrate_gate.decisions import TriageFn
 from eval.metrics import STRATA, approx_llm_cost_per_call, USD_TO_INR
 
 CONFIGS = ("rules_only", "hybrid", "llm_only")
@@ -77,7 +78,10 @@ def predict_rules_only(bank_lines: list[dict], payments: list, ground_truth: dic
     return preds
 
 
-def predict_hybrid(bank_lines: list[dict], payments: list, ground_truth: dict) -> list[Prediction]:
+def predict_hybrid(
+    bank_lines: list[dict], payments: list, ground_truth: dict, triage_fn: Optional[TriageFn] = None
+) -> list[Prediction]:
+    triage_fn = triage_fn or fallback_triage_fn
     payments_by_id = {p.payment_id: p for p in payments}
     results = run_l1(bank_lines, payments)
     preds = []
@@ -90,13 +94,16 @@ def predict_hybrid(bank_lines: list[dict], payments: list, ground_truth: dict) -
             continue
         value_date = normalize_timestamp(row["value_date"])
         candidates = _candidate_dicts(payments_by_id, outcome.candidate_payment_ids, value_date)
-        response = fallback_triage(row["narration"], candidates)
+        response, _meta = triage_fn(row, candidates)
         order_ids = [payments_by_id[response.candidate_id].order_id] if response.candidate_id else []
         preds.append(Prediction(bl_id, gt["difficulty"], order_ids, gt.get("correct_match"), True))
     return preds
 
 
-def predict_llm_only(bank_lines: list[dict], payments: list, ground_truth: dict) -> list[Prediction]:
+def predict_llm_only(
+    bank_lines: list[dict], payments: list, ground_truth: dict, triage_fn: Optional[TriageFn] = None
+) -> list[Prediction]:
+    triage_fn = triage_fn or fallback_triage_fn
     payments_by_id = {p.payment_id: p for p in payments}
     index = PaymentIndex(payments)
     preds = []
@@ -106,7 +113,7 @@ def predict_llm_only(bank_lines: list[dict], payments: list, ground_truth: dict)
         value_date = normalize_timestamp(row["value_date"])
         window_payments = index.candidates_before(value_date)
         candidates = _candidate_dicts(payments_by_id, [p.payment_id for p in window_payments], value_date)
-        response = fallback_triage(row["narration"], candidates)
+        response, _meta = triage_fn(row, candidates)
         order_ids = [payments_by_id[response.candidate_id].order_id] if response.candidate_id else []
         preds.append(Prediction(bl_id, gt["difficulty"], order_ids, gt.get("correct_match"), True))
     return preds
@@ -139,7 +146,7 @@ def score(preds: list[Prediction]) -> dict:
     return {"n": len(preds), "tp": tp, "fp": fp, "fn": fn, "precision": precision, "recall": recall, "f1": f1}
 
 
-def run_ablation(data_dir: Path, split: str = "holdout") -> dict:
+def run_ablation(data_dir: Path, split: str = "holdout", triage_fn: Optional[TriageFn] = None) -> dict:
     bank_lines_all = load_bank_lines(data_dir / "bank_statement.csv")
     payments = load_ledger_payments(data_dir / "internal_ledger.csv")
     ground_truth = json.loads((data_dir / "ground_truth.json").read_text())
@@ -150,7 +157,11 @@ def run_ablation(data_dir: Path, split: str = "holdout") -> dict:
     table: dict[str, dict[str, dict]] = {}  # config -> stratum -> score dict (+ llm_calls, cost, latency)
     for config, predictor in PREDICTORS.items():
         start = time.perf_counter()
-        preds = predictor(bank_lines, payments, ground_truth)
+        preds = (
+            predictor(bank_lines, payments, ground_truth)
+            if config == "rules_only"
+            else predictor(bank_lines, payments, ground_truth, triage_fn=triage_fn)
+        )
         elapsed = time.perf_counter() - start
 
         by_stratum = defaultdict(list)
@@ -210,6 +221,24 @@ def apply_decision_rule(table: dict) -> dict:
     }
 
 
+def _resolve_triage_fn() -> tuple[TriageFn, str]:
+    """Auto-detects a live LLM credential (`l2_llm_triage/factory.py`) and returns its `.triage`
+    method; falls back to the free rapidfuzz path when none is usable. Never raises -- a missing
+    key degrades the *measurement*, not the ability to run `make bench` at all.
+    """
+    try:
+        from ledgerguard.config import get_settings
+        from ledgerguard.l2_llm_triage.factory import build_triage_client
+
+        client, label = build_triage_client(get_settings())
+        if client is not None:
+            return client.triage, label
+        print(f"make bench: {label}")
+    except Exception as exc:
+        print(f"make bench: no usable LLM credentials ({exc}); using the free fallback only.")
+    return fallback_triage_fn, "fallback_rapidfuzz"
+
+
 def main() -> None:
     import argparse
 
@@ -217,17 +246,24 @@ def main() -> None:
     parser.add_argument("--data-dir", type=Path, default=Path("data/raw"))
     parser.add_argument("--split", default="holdout")
     parser.add_argument("--out", type=Path, default=Path("eval/output/ablation.json"))
+    parser.add_argument("--no-llm", action="store_true", help="Use only the free fallback; never call a model.")
     args = parser.parse_args()
 
     data_dir = args.data_dir
     if not (data_dir / "bank_statement.csv").exists():
         data_dir = Path("data/samples")
 
-    table = run_ablation(data_dir, split=args.split)
+    triage_fn, llm_label = (fallback_triage_fn, "fallback_rapidfuzz") if args.no_llm else _resolve_triage_fn()
+    print(f"L2 provider for this run: {llm_label}")
+
+    table = run_ablation(data_dir, split=args.split, triage_fn=triage_fn)
     decision = apply_decision_rule(table)
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(json.dumps({"table": table, "decision": decision}, indent=2, sort_keys=True), encoding="utf-8")
+    args.out.write_text(
+        json.dumps({"table": table, "decision": decision, "llm_provider": llm_label}, indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
 
     print(f"Pre-registered ablation, {data_dir}/, split={args.split}:")
     print(f"{'stratum':<12}{'n':>5}{'rules F1':>10}{'hybrid F1':>11}{'llm F1':>9}{'llm calls':>11}{'INR/1k':>9}")

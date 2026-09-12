@@ -379,3 +379,54 @@ this environment's egress proxy — confirmed by attempting the fetch and gettin
 Docker-based Web Service by hand, pointing at the repo's `Dockerfile` directly, with no
 Blueprint file required — sidestepping the one part that couldn't be checked against a live
 source.
+
+## 2026-08-30 — A claim that was never actually tested, and a seam that was never actually built
+
+**What broke:** `README.md`/`REAL_VS_SIMULATED.md` stated "no session has ever had network
+egress to `api.anthropic.com`," phrased alongside the (true) statement that no session ever had
+an `LLM_API_KEY`. Those are two different claims, and only one had ever been checked. A direct
+`curl https://api.anthropic.com/v1/models` in this session returned a genuine Anthropic
+`request_id` with a 401 (missing key) — a real response from Anthropic's own edge, categorically
+different from the proxy-level `CONNECT tunnel failed, 403` that `razorpay.com` and `vercel.app`
+still return in the same session. The network was never the blocker. Nobody had checked.
+
+**Second, separate bug found while trying to fix the first one:** even with a credential, the
+free fallback (`fallback.py`) was imported and called directly, by name, at the top of
+`decisions.py` and twice in `benchmark/ablation.py` — with no parameter to swap it out. `make
+close`, `make bench`, and the deployed API would all have kept calling the fallback regardless of
+what `LLM_API_KEY` was set to. Only `python -m ledgerguard.l2_llm_triage.run` could ever reach
+`TriageClient`, and nothing in the benchmark/production path ever called that module. This is why
+Δ=0.000 was reported as "the LLM adds nothing" when what had actually been measured was "a
+rapidfuzz stub that only answers when exactly one candidate exists" — true for zero of the 12 real
+residual records in `data/samples` (`MAX_CANDIDATES_FOR_L2` bounds each to up to 10).
+
+**Fix:** a `triage_fn` parameter threaded through `decisions_for`/`build_decision_dataset`
+(`decisions.py`), `predict_hybrid`/`predict_llm_only`/`run_ablation` (`benchmark/ablation.py`),
+and `run_close` (`close.py`), all defaulting to the free fallback so no existing caller's
+behavior changed. `config.Settings` no longer requires any secret (`= ""` defaults throughout);
+a new `l2_llm_triage/factory.py` auto-detects Anthropic, OpenAI, or Gemini from whichever key is
+set and builds the matching client (`providers.py`, new — same `.triage()` contract as the
+existing Anthropic-only `client.py`).
+
+**Then run for real, and a third bug found doing that:** the first live attempt used
+`gemini-2.5-flash` and repeatedly failed with a schema-validation abstention on real (10-candidate)
+prompts, despite a hand-built diagnostic call with a single candidate working perfectly. Root
+cause, found by reproducing the exact real prompt against a model with fresh quota rather than
+guessing: `TriageClient`'s own retry loop (`MAX_ATTEMPTS=2`) doubles real API calls on every
+validation failure, and `gemini-2.5-flash`'s free tier caps at 20 requests/day (not per-minute, as
+the first 429's error text implied — a second, later 429 revealed the real
+`GenerateRequestsPerDayPerProjectPerModel-FreeTier` quota once the per-minute one had already been
+retried past). The quota was exhausted mid-batch, not the client's parsing logic. Switching to
+`gemini-3.5-flash-lite` (separate quota bucket, verified with the same real prompt first) resolved
+it: all 12 real residual records ran cleanly, no retries needed, $0.0016 total.
+
+**The result, cross-checked against ground truth rather than taken at face value:** the model
+abstained on all 12. Five (`bl_stray_*`) have `correct_match: null` in ground truth — correctly
+unmatchable, and abstaining was the right answer. The other seven are multi-order
+`SPLIT_SETTLEMENT` lines whose true answer is a *sum* of several payments; L2's schema (name one
+`payment_id`, or null) cannot express that regardless of which model answers it, so abstaining
+was the only honest option there too. Re-running the pre-registered ablation's `hybrid` arm
+against this same live client (cache-hit on the 4 holdout-split records, $0 marginal cost)
+reproduced Δ=0.000 exactly — the real model reached the same null-candidate conclusion the
+fallback reached for an unrelated, weaker reason (it can only ever try when exactly one candidate
+exists). See `REAL_VS_SIMULATED.md` row 15 for the full account.

@@ -24,6 +24,13 @@ dev = [
     "pytest>=8.0",
     "httpx>=0.27",
 ]
+# L2 defaults to Anthropic (a base dependency, since every doc/pricing table in this repo was
+# written against it) or the free fallback. These two are only imported, lazily, by
+# l2_llm_triage/factory.py when the matching credential is set -- not needed for
+# make close/make demo/make bench/the deployed API, so they stay optional rather than bloating
+# every install.
+openai = ["openai>=1.0"]
+gemini = ["google-generativeai>=0.8"]
 
 [build-system]
 requires = ["setuptools>=68", "wheel"]
